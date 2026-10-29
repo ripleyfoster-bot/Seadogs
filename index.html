@@ -6782,7 +6782,7 @@ const FLAG_MIN = 9;
 /* SEA-H, OL-3 DETAIL — the ranges inside which a ship earns its detail
    (planks and sail shading · gun ports · crew), [ASSUMED], picked so a
    pack of four at danger 6 costs the phone nothing it can feel. */
-const DETAIL_PLANKS = 700, DETAIL_PORTS = 600, DETAIL_CREW = 380;
+const DETAIL_PLANKS = 700, DETAIL_PORTS = 900, DETAIL_CREW = 380;
 /* SEA-H — HER HULL, UNDER THE ENSIGN. Ripley, 29 Oct 21:30: "see how
    much the value of each hull is, a line slider like the hull slider
    next to the ensign". A bar the flag's width under the flag, her
@@ -6852,10 +6852,10 @@ function drawShip(c, C, rel, hw, hh, cls){
       const n = qrot(c.q, [sd,0,0]); if(-(n[0]*los[0]+n[2]*los[2]) < 0.05*Math.hypot(los[0],los[2])) continue;
       for(const pz of [[-22,9],[-6,10],[10,9]]){
         const z = pz[0], x = sd*pz[1];
-        const port = [pts3([x,2.2,z-2.2]), pts3([x,2.2,z+2.2]), pts3([x,4.8,z+2.2]), pts3([x,4.8,z-2.2])];
+        const port = [pts3([x,1.8,z-2.8]), pts3([x,1.8,z+2.8]), pts3([x,5.2,z+2.8]), pts3([x,5.2,z-2.8])];
         if(pathCam(port, hw, hh)){ ctx.fillStyle = "rgba(12,10,10,"+(0.9-hz).toFixed(2)+")"; ctx.fill(); }
-        const m0 = pts3([x,3.5,z]), m1 = pts3([x+sd*3.2,3.5,z]);
-        if(m0[2] > NEAR && m1[2] > NEAR){ ctx.strokeStyle = "rgba(30,28,28,"+(0.95-hz).toFixed(2)+")"; ctx.lineWidth = Math.max(1, F*1.4/m0[2]); ctx.beginPath(); segCam(m0, m1, hw, hh); ctx.stroke(); }
+        const m0 = pts3([x,3.5,z]), m1 = pts3([x+sd*4.5,3.5,z]);
+        if(m0[2] > NEAR && m1[2] > NEAR){ ctx.strokeStyle = "rgba(30,28,28,"+(0.95-hz).toFixed(2)+")"; ctx.lineWidth = Math.max(1.5, F*1.8/m0[2]); ctx.beginPath(); segCam(m0, m1, hw, hh); ctx.stroke(); }
       }
     }
     ctx.lineWidth = 1;
@@ -7024,16 +7024,16 @@ function drawIsland(o, C, rel, hw, hh, isHarbour){
   /* the trees: a stem and a canopy, each a billboard square to the view, inside DETAIL_TREES u */
   if(d < DETAIL_TREES && det.trees.length){
     const yaw = headingOf(q) + lookOff, rx = Math.cos(yaw), rz = -Math.sin(yaw);     /* the view's right hand, on the water */
-    const canopy = mix(shade(col, 0.55), LAND_HAZE, hz), stem = mix([60,44,30], LAND_HAZE, hz);
+    const canopy = mix([16,46,24], LAND_HAZE, hz), stem = mix([70,50,34], LAND_HAZE, hz), edge = mix(MOONLIT, LAND_HAZE, hz);
     const fade = 1 - d/DETAIL_TREES;
     for(const t of det.trees){
       const tx = Math.cos(t[0])*t[1]*o.r, tz = Math.sin(t[0])*t[1]*o.r;
-      const ground = o.h*Math.max(0, 1 - t[1]/0.9)*0.9, th = t[2], tw = th*0.55;
+      const ground = o.h*Math.max(0, 1 - t[1]/0.85), th = t[2], tw = th*0.5;
       const b = toCam(C, [rel[0]+tx, 0, rel[2]+tz], ground); if(b[2] <= NEAR) continue;
       const s = toCam(C, [rel[0]+tx, 0, rel[2]+tz], ground+th*0.35);
       ctx.strokeStyle = rgb(stem, 0.9*fade); ctx.lineWidth = Math.max(1, F*0.8/b[2]); ctx.beginPath(); segCam(b, s, hw, hh); ctx.stroke();
       const tri = [toCam(C, [rel[0]+tx-rx*tw, 0, rel[2]+tz-rz*tw], ground+th*0.3), toCam(C, [rel[0]+tx+rx*tw, 0, rel[2]+tz+rz*tw], ground+th*0.3), toCam(C, [rel[0]+tx, 0, rel[2]+tz], ground+th)];
-      if(pathCam(tri, hw, hh)){ ctx.fillStyle = rgb(canopy, 0.95*fade); ctx.fill(); }
+      if(pathCam(tri, hw, hh)){ ctx.fillStyle = rgb(canopy, 0.95*fade); ctx.fill(); ctx.strokeStyle = rgb(edge, 0.6*fade); ctx.lineWidth = 1; ctx.stroke(); }
     }
     ctx.lineWidth = 1;
   }
@@ -7042,7 +7042,7 @@ function drawIsland(o, C, rel, hw, hh, isHarbour){
    once per island from its own place on the water, never from the
    island stream. hue 0 jungle: many trees; 1 scrub: a few; 2 rock: one
    or none. [ASSUMED] */
-const DETAIL_TREES = 900;
+const DETAIL_TREES = 1200;
 function islandDetail(o){
   if(o._det) return o._det;
   let s = (Math.floor(o.p[0]*7.3) ^ Math.floor(o.p[2]*11.7) ^ 0x51ED) >>> 0;
@@ -7051,7 +7051,7 @@ function islandDetail(o){
   for(let i=0;i<np;i++) peaks.push([r()*6.283, 0.2+r()*0.35, 0.3+r()*0.3, 0.45+r()*0.45]);   /* angle · offset frac · base frac · height frac */
   const ring = []; for(let k=0;k<6;k++) ring.push([k/6*6.283, 0.8+r()*0.4]);
   const trees = [], nt = o.hue === 0 ? 10+Math.floor(r()*7) : o.hue === 1 ? 3+Math.floor(r()*4) : Math.floor(r()*2);
-  for(let i=0;i<nt;i++) trees.push([r()*6.283, 0.3+r()*0.6, 7+r()*7]);          /* angle · radius frac · height u */
+  for(let i=0;i<nt;i++) trees.push([r()*6.283, 0.12+r()*0.45, 11+r()*9]);        /* angle · radius frac (upper slopes, on the skyline) · height u. Ripley 21:53: the first cut's were lower and darker and he saw none */
   return (o._det = { peaks:peaks, ring:ring, trees:trees });
 }
 
@@ -7217,17 +7217,7 @@ function render(){
     segCam(pt([0,4,-6]), pt([0,40,-6]), hw, hh);
     segCam(pt([-10,27,-6]), pt([10,27,-6]), hw, hh);
     ctx.stroke();
-    /* SEA-H DETAIL: two of your own hands on the deck ahead, one a side, walking their rounds between the guns */
-    for(let i=0;i<2;i++){
-      const sd = i ? 1 : -1, ph = seaT*1.1 + i*2.6;
-      const u = (ph % 2 < 1) ? ph % 1 : 1 - ph % 1;
-      const zz = -22 + u*28, xx = sd*(8 - Math.max(0, zz+12)*0.12) + Math.sin(ph*3)*0.3;
-      const foot = pt([xx, 3.6, zz]), head = pt([xx, 8.2, zz]);
-      if(foot[2] <= NEAR) continue;
-      ctx.strokeStyle = "rgba(38,28,22,0.95)"; ctx.lineWidth = Math.max(1.5, F*1.2/foot[2]); ctx.beginPath(); segCam(foot, head, hw, hh); ctx.stroke();
-      ctx.fillStyle = "rgba(214,170,130,0.95)"; ctx.beginPath(); ctx.arc(hw+F*head[0]/head[2], hh-F*head[1]/head[2], Math.max(1, F*0.38/head[2]), 0, Math.PI*2); ctx.fill();
-    }
-    ctx.lineWidth = 1;
+    /* SEA-H DETAIL: two of your own hands walked the deck ahead in the third cut — Ripley, 21:53: "annoying". Gone; the other ships keep theirs. */
     /* your broadside: the flash from the rail on that side, and the smoke */
     if(pShow > 0){ const k = pShow/SHOT_SHOW, s = pSide;
       const g = ctx.createRadialGradient(hw + s*W*0.42, H*0.78, 4, hw + s*W*0.42, H*0.78, W*0.45);
