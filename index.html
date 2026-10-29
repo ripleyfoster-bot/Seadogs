@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#050709">
-<title>SEA DOGS sea-g — pirate reskin of ELITE: THE CLONES 110c</title>
+<title>SEA DOGS sea-h — pirate reskin of ELITE: THE CLONES 110c</title>
 <!-- S71, session 039. THREE BUILDS WERE PUBLISHED THIS SESSION READING
      037e. 039a, 039b and 039c each changed the report function and none
      bumped either marker, so S57's arrival check — read the header in
@@ -6821,14 +6821,49 @@ function drawShip(c, C, rel, hw, hh, cls){
 }
 
 /* ---------- an island: a sand ring, then the hill as a fan of shaded facets ---------- */
-const LIGHT = [0.55, 0.0, 0.83];
+/* SEA-H, OL-3 — ISLANDS AT NIGHT. s02's finding: the hull was lost to
+   islands more than to shot. Three faults in sea-g's picture, all
+   presentation: (1) haze() mixed the land toward HAZE, which is the
+   horizon sky's own colour, so with distance an island BECAME the sky;
+   (2) the facets were lit from a fixed vector, not from the moon that
+   is drawn; (3) nothing marked the waterline. Now: the land hazes
+   toward LAND_HAZE, darker than the sky band at every range, so a
+   distant island is a black mass blotting out the sky as it is at sea;
+   the facets are lit from the moon's bearing and the lit ones take a
+   cold moonlight; and a SURF LINE — white, breaking, its own phase per
+   island — runs round the shore, never under 1 px, the first thing a
+   lookout sees at night. Every colour and figure [ASSUMED]. */
+let LIGHT = [0.55, 0.0, 0.83];                 /* set each frame from the moon's bearing — render() */
+const LAND_HAZE = [26,30,50], MOONLIT = [168,176,190];
+const SURF_R = 1.09;                           /* the surf's ring, as a fraction of the hit radius; the sand's is 1.07 */
 function drawIsland(o, C, rel, hw, hh, isHarbour){
   const d = Math.hypot(rel[0], rel[2]);
   const hz = haze(d);
   const ringW = o.poly.map(function(a){ return toCam(C, [rel[0]+Math.cos(a[0])*a[1]*o.r, 0, rel[2]+Math.sin(a[0])*a[1]*o.r], 0); });
   /* the sand: the ring a touch wider */
   const sandW = o.poly.map(function(a){ return toCam(C, [rel[0]+Math.cos(a[0])*a[1]*o.r*1.07, 0, rel[2]+Math.sin(a[0])*a[1]*o.r*1.07], 0); });
-  if(pathCam(sandW, hw, hh)){ ctx.fillStyle = rgb(mix(SAND, HAZE, hz)); ctx.fill(); }
+  if(pathCam(sandW, hw, hh)){ ctx.fillStyle = rgb(mix(SAND, LAND_HAZE, hz*0.8)); ctx.fill(); }
+  /* the surf: segment by segment round the shore, each breaking on its
+     own beat; drawn before the hill so the far shore's surf is behind it */
+  if(!isHarbour){
+    const n = o.poly.length, ph0 = (o.p[0]*0.013 + o.p[2]*0.007) % 6.283;
+    const surfW = o.poly.map(function(a){ return toCam(C, [rel[0]+Math.cos(a[0])*a[1]*o.r*SURF_R, 0, rel[2]+Math.sin(a[0])*a[1]*o.r*SURF_R], 0); });
+    for(let i=0;i<n;i++){
+      const A = surfW[i], B = surfW[(i+1)%n];
+      if(A[2] < NEAR && B[2] < NEAR) continue;
+      const zm = Math.max(NEAR, (A[2]+B[2])/2);
+      const beat = 0.5 + 0.5*Math.sin(seaT*1.7 + ph0 + i*1.9);
+      const a = (0.35 + 0.55*beat) * (1 - hz*0.5);
+      ctx.lineWidth = Math.max(1, F*(2.5+2*beat)/zm);
+      ctx.strokeStyle = "rgba(236,242,248,"+a.toFixed(2)+")";
+      ctx.beginPath(); segCam(A, B, hw, hh); ctx.stroke();
+      if(zm < 700){                                /* close in: the foam spreading over the sand */
+        ctx.lineWidth = Math.max(1, F*(6+4*beat)/zm);
+        ctx.strokeStyle = "rgba(236,242,248,"+(0.16*beat*(1-zm/700)).toFixed(2)+")";
+        ctx.beginPath(); segCam(A, B, hw, hh); ctx.stroke(); }
+    }
+    ctx.lineWidth = 1;
+  }
   const col = isHarbour ? [88,84,72] : ISLAND_RGB[o.hue];
   if(isHarbour){
     /* the harbour island is flat and walled; its channel is cut from the rim to the quay */
@@ -6871,13 +6906,59 @@ function drawIsland(o, C, rel, hw, hh, isHarbour){
     const a = o.poly[i], b = o.poly[(i+1)%n];
     const ma = (a[0]+b[0])/2 + (i === n-1 ? Math.PI : 0);
     const nx = Math.cos(ma), nz = Math.sin(ma);
-    const k = 0.5 + 0.5*Math.max(0, nx*LIGHT[0] + nz*LIGHT[2]);
-    facets.push({ pts:[ringW[i], ringW[(i+1)%n], peak], z:(ringW[i][2]+ringW[(i+1)%n][2]+peak[2])/3, k:k });
+    const lit = Math.max(0, nx*LIGHT[0] + nz*LIGHT[2]);
+    const k = 0.5 + 0.5*lit;
+    facets.push({ pts:[ringW[i], ringW[(i+1)%n], peak], z:(ringW[i][2]+ringW[(i+1)%n][2]+peak[2])/3, k:k, lit:lit });
   }
   facets.sort(function(p,q){ return q.z - p.z; });
   for(const f of facets){
-    if(pathCam(f.pts, hw, hh)){ ctx.fillStyle = rgb(mix(shade(col, 0.45+0.6*f.k), HAZE, hz)); ctx.fill(); }
+    if(pathCam(f.pts, hw, hh)){
+      const c = mix(shade(col, 0.4+0.6*f.k), MOONLIT, 0.3*f.lit*f.lit);   /* the moon on the facets that face it */
+      ctx.fillStyle = rgb(mix(c, LAND_HAZE, hz)); ctx.fill();
+      /* the skyline: a thin moonlit edge on the lit facets, so the mass reads against the sky */
+      if(f.lit > 0.3 && hz < 0.85){ ctx.strokeStyle = rgb(MOONLIT, 0.35*f.lit*(1-hz)); ctx.lineWidth = 1; ctx.stroke(); }
+    }
   }
+}
+
+/* SEA-H, OL-3 — THE LOOKOUT. s02 named the alternative to islands that
+   read earlier: "or a crow's-nest cue". This is both at once — a man at
+   the masthead who hails when the COURSE runs onto land. Each frame,
+   for every island: the ship's track from `pos` along its heading; if
+   it passes inside the island's hit radius plus HAIL_MARGIN within the
+   next HAIL_S seconds at the speed being made (never less than
+   HAIL_MIN_U ahead, so a slow ship is still warned), the nearest shore
+   on that track is the hail. Under HAIL_URGENT_S it is BREAKERS, with
+   the helm order away from the island's centre. The harbour is not
+   hailed: you make for it on purpose and its lamps mark it. Reads pos,
+   q, speed, objects; writes nothing; the four figures [ASSUMED]. Why
+   it matters more than the picture: in a fight the head is turned to
+   the rail and the bow is out of view — the hail and the tape mark are
+   seen either way. */
+const HAIL_S = 10, HAIL_MIN_U = 240, HAIL_MARGIN = 25, HAIL_URGENT_S = 4;
+let hailsRaised = 0, hailLast = "", hailWas = false, lastHailObj = null;
+function lookoutHail(){
+  const v = Math.abs(speed); if(v < 1){ hailWas = false; lastHailObj = null; return null; }
+  const h = headingOf(q), dx = Math.sin(h), dz = Math.cos(h);
+  const reach = Math.max(HAIL_MIN_U, v*HAIL_S);
+  let best = null;
+  for(const o of objects){
+    const rx = wrap(o.p[0]-pos[0]), rz = wrap(o.p[2]-pos[2]);
+    const along = rx*dx + rz*dz; if(along <= 0) continue;          /* astern */
+    const across = rx*dz - rz*dx;                                  /* +ve: the island's centre is to starboard of the track */
+    const R = o.r + HAIL_MARGIN;
+    if(Math.abs(across) >= R) continue;                            /* the track clears it */
+    const shore = along - Math.sqrt(R*R - across*across);          /* along the track to its edge */
+    if(shore > reach) continue;
+    if(!best || shore < best.shore) best = { o:o, shore:Math.max(0, shore), across:across, bearing:Math.atan2(rx, rz), rel:Math.atan2(across, along) };
+  }
+  if(best){ best.secs = best.shore / v;
+    if(!hailWas){ hailsRaised++; hailLast = Math.round(best.shore)+" u at "+v.toFixed(0)+" u/s, "+Math.round(best.rel*180/Math.PI)+"° off the bow"; } }
+  hailWas = !!best; lastHailObj = best ? best.o : null;
+  return best;
+}
+function lookoutLine(){
+  return "hail inside "+HAIL_S+" s (min "+HAIL_MIN_U+" u), margin "+HAIL_MARGIN+" u, breakers under "+HAIL_URGENT_S+" s · raised "+hailsRaised+(hailLast ? " · last "+hailLast : "")+" · surf ring "+SURF_R+" r";
 }
 
 function render(){
@@ -6896,8 +6977,9 @@ function render(){
     ctx.fillStyle="rgba(230,235,255,"+(s[3]*0.8*Math.min(1,(horizon-y)/60)).toFixed(2)+")";
     ctx.fillRect(x,y,1,1);
   }
-  /* the moon, low, away from the wind */
+  /* the moon, low, away from the wind — and the light the islands are lit by (sea-h) */
   { const ma = wind.heading + Math.PI*0.75, me = 22*Math.PI/180;
+    LIGHT = [Math.sin(ma), 0, Math.cos(ma)];
     const v = qrot(C.cq, [Math.sin(ma)*Math.cos(me), Math.sin(me), Math.cos(ma)*Math.cos(me)]);
     const vy = v[1]*C.cp + v[2]*C.sp, vz = -v[1]*C.sp + v[2]*C.cp;
     if(vz > 0.05){ const x=hw+F*v[0]/vz, y=hh-F*vy/vz;
@@ -7022,6 +7104,7 @@ function render(){
      the harbour as an anchor mark, every ship on the radar as a dot in
      its colour — so a ship abeam is known before it is seen. Nothing
      here is state; it reads the same records the radar does. */
+  const hail = lookoutHail();
   { const hdg = headingOf(q) + lookOff;
     const TY = 48;                       /* below the PANEL / TUNE corners */
     ctx.fillStyle = "rgba(0,0,0,0.28)"; ctx.fillRect(0,TY,W,18);
@@ -7042,8 +7125,21 @@ function render(){
     { const rel=[wrap(station.p[0]-pos[0]), 0, wrap(station.p[2]-pos[2])]; mark(Math.atan2(rel[0], rel[2]), "⚓", rgb(INK, 0.95), false); }
     for(const c of contacts){ const rel=[wrap(c.pos[0]-pos[0]), 0, wrap(c.pos[2]-pos[2])]; if(Math.hypot(rel[0],rel[2]) > T.radarRange) continue;
       mark(Math.atan2(rel[0], rel[2]), "", "rgb("+ROLE_RGB[c.role]+")", true, 15); }
+    /* sea-h: the land the lookout has hailed, as a mark on the tape at its bearing — read even with the head turned to a rail */
+    if(hail){ const urgent = hail.secs < HAIL_URGENT_S, blink = urgent && Math.sin(seaT*12) > 0;
+      ctx.font = "bold 11px ui-monospace, Menlo, monospace"; mark(hail.bearing, "▲", blink ? "rgba(255,120,90,1)" : rgb(INK, 0.95), false); ctx.font = "9px ui-monospace, Menlo, monospace"; }
     ctx.strokeStyle = rgb(INK, 0.6); ctx.beginPath(); ctx.moveTo(hw, TY); ctx.lineTo(hw, TY+18); ctx.stroke();
-    if(Math.abs(lookOff) > 0.01){ ctx.fillStyle = rgb(INK, 0.8); ctx.textAlign = lookOff < 0 ? "left" : "right"; ctx.fillStyle = "rgba(0,0,0,0.28)"; ctx.fillRect(0,TY+18,W,14); ctx.fillStyle = rgb(INK, 0.8); ctx.fillText(lookOff < 0 ? "◀ LOOKING "+Math.round(-lookOff*180/Math.PI)+"° TO PORT · TAP FOR THE BOW" : "LOOKING "+Math.round(lookOff*180/Math.PI)+"° TO STARBOARD · TAP FOR THE BOW ▶", lookOff < 0 ? 6 : W-6, TY+25); }
+    let ty2 = TY+18;
+    if(Math.abs(lookOff) > 0.01){ ctx.fillStyle = rgb(INK, 0.8); ctx.textAlign = lookOff < 0 ? "left" : "right"; ctx.fillStyle = "rgba(0,0,0,0.28)"; ctx.fillRect(0,TY+18,W,14); ctx.fillStyle = rgb(INK, 0.8); ctx.fillText(lookOff < 0 ? "◀ LOOKING "+Math.round(-lookOff*180/Math.PI)+"° TO PORT · TAP FOR THE BOW" : "LOOKING "+Math.round(lookOff*180/Math.PI)+"° TO STARBOARD · TAP FOR THE BOW ▶", lookOff < 0 ? 6 : W-6, TY+25); ty2 = TY+32; }
+    /* sea-h, OL-3: THE LOOKOUT'S HAIL — one line under the tape while the course runs onto land */
+    if(hail){
+      const urgent = hail.secs < HAIL_URGENT_S, blink = urgent && Math.sin(seaT*12) > 0;
+      const deg = Math.round(Math.abs(hail.rel)*180/Math.PI);
+      const where = deg < 4 ? "DEAD AHEAD" : deg+"° ON THE "+(hail.rel < 0 ? "PORT" : "STARBOARD")+" BOW";
+      const text = urgent ? "BREAKERS "+where+" — HARD A-"+(hail.across > 0 ? "PORT" : "STARBOARD")+"!" : "LAND HO — "+where+" · "+Math.round(hail.shore)+" u · "+hail.secs.toFixed(0)+" s";
+      ctx.textAlign = "center"; ctx.fillStyle = urgent ? "rgba(90,20,10,0.6)" : "rgba(0,0,0,0.32)"; ctx.fillRect(0,ty2,W,14);
+      ctx.fillStyle = urgent ? (blink ? "rgba(255,120,90,1)" : "rgba(255,200,170,1)") : rgb(INK, 0.95); ctx.fillText(text, hw, ty2+7);
+    }
     ctx.textAlign = "left";
   }
   if(transit && transit.fade > 0){ ctx.fillStyle="rgba(0,0,0,"+transit.fade.toFixed(3)+")"; ctx.fillRect(0,0,W,H); }
@@ -7083,6 +7179,10 @@ function drawRadar(){
     rctx.beginPath();
     o.poly.forEach(function(a,i){ const p = toS([rel[0]+Math.cos(a[0])*a[1]*o.r, 0, rel[2]+Math.sin(a[0])*a[1]*o.r]); if(i) rctx.lineTo(p[0],p[1]); else rctx.moveTo(p[0],p[1]); });
     rctx.closePath(); rctx.fill();
+    /* sea-h, OL-3: the shore drawn round it, so land reads on the dark dial; the hailed island in the lookout's colour */
+    const hailed = hailWas && lastHailObj === o;
+    rctx.strokeStyle = hailed ? (Math.sin(seaT*12) > 0 ? "rgba(255,120,90,1)" : rgb(INK, 0.9)) : rgb(SAND, 0.55);
+    rctx.lineWidth = hailed ? 1.5 : 1; rctx.stroke(); rctx.lineWidth = 1;
   }
   rctx.restore();
   /* the harbour */
@@ -7670,7 +7770,7 @@ function overrideLine(){
 }
 function writeReport(){
   lastReport =
-    "SEA DOGS sea-g — pirate reskin of ELITE: THE CLONES 110c — settings\n"+   /* 109b, S353: this line read 108f in 109a — the one marker the title tag did not move. 110a: both markers grepped before export (s110 §0) */
+    "SEA DOGS sea-h — pirate reskin of ELITE: THE CLONES 110c — settings\n"+   /* 109b, S353: this line read 108f in 109a — the one marker the title tag did not move. 110a: both markers grepped before export (s110 §0) */
     "deadzone      "+T.dead+" px  (spec 6)\n"+
     "deflection    "+T.defl+" px  (spec 55)\n"+
     "exponent      "+T.exp.toFixed(1)+"     (spec 1.6)\n"+
@@ -7772,6 +7872,7 @@ function writeReport(){
        and the session's changes are printed beside it. */
     "equipment     "+equipLine()+"\n"+
     "shipwright    "+swReportLine()+"  [ASSUMED] sea-g\n"+
+    "lookout       "+lookoutLine()+"  [ASSUMED] sea-h\n"+
     "laser         "+laserLine()+"\n"+
     "fired         "+fireLine()+"\n"+
     "hits taken    "+takenLine()+"\n"+
