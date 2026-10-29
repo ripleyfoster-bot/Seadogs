@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#050709">
-<title>SEA DOGS sea-f — pirate reskin of ELITE: THE CLONES 110c</title>
+<title>SEA DOGS sea-g — pirate reskin of ELITE: THE CLONES 110c</title>
 <!-- S71, session 039. THREE BUILDS WERE PUBLISHED THIS SESSION READING
      037e. 039a, 039b and 039c each changed the report function and none
      bumped either marker, so S57's arrival check — read the header in
@@ -23,8 +23,11 @@
 <meta name="apple-mobile-web-app-title" content="Sea Dogs">
 <!-- Loop 21. iOS installs without a manifest; Windows and desktop Chrome do
      not offer install at all without one. -->
-<link rel="manifest" href="/manifest.webmanifest">
-<link rel="apple-touch-icon" href="/icon-192.png">
+<!-- sea-g: SEA DOGS has its own repository. The links are RELATIVE so a
+     GitHub Pages path (user.github.io/seadogs/) finds them; "/" would
+     ask the site root, where Elite's manifest may live. -->
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icon-192.png">
 <style>
   :root{
     --ink:#e9cf8f;        /* SEA DOGS: brass on a dark deck — the space game's phosphor was #e9cf8f */
@@ -7667,7 +7670,7 @@ function overrideLine(){
 }
 function writeReport(){
   lastReport =
-    "SEA DOGS sea-f — pirate reskin of ELITE: THE CLONES 110c — settings\n"+   /* 109b, S353: this line read 108f in 109a — the one marker the title tag did not move. 110a: both markers grepped before export (s110 §0) */
+    "SEA DOGS sea-g — pirate reskin of ELITE: THE CLONES 110c — settings\n"+   /* 109b, S353: this line read 108f in 109a — the one marker the title tag did not move. 110a: both markers grepped before export (s110 §0) */
     "deadzone      "+T.dead+" px  (spec 6)\n"+
     "deflection    "+T.defl+" px  (spec 55)\n"+
     "exponent      "+T.exp.toFixed(1)+"     (spec 1.6)\n"+
@@ -7768,6 +7771,7 @@ function writeReport(){
        trader kill that leaves it at 0 IS a fault. The band, the police
        and the session's changes are printed beside it. */
     "equipment     "+equipLine()+"\n"+
+    "shipwright    "+swReportLine()+"  [ASSUMED] sea-g\n"+
     "laser         "+laserLine()+"\n"+
     "fired         "+fireLine()+"\n"+
     "hits taken    "+takenLine()+"\n"+
@@ -9650,6 +9654,225 @@ function svcHullReportLine(){
 }
 
 
+/* ==================================================================
+   SEA-G — THE SHIPWRIGHT. Session 03, 30 October 2026.
+   [DECISION], Ripley, s03 (two questions, answered before any code):
+     (a) battery prices are the EQUIPMENT spec's laser prices as they
+         stand — no new sea figures;
+     (b) the Galleon is TRADED AGAINST THE SLOOP: pay the difference,
+         modules transfer for the fee.
+   And his Sep 2026 rule (ships, upgrades and weapons): modules are
+   sellable and transferable; the fee varies by tech level — a high-tech
+   port charges MORE for new kit and LESS to move it (~25 % at TL 4,
+   ~15 % at TL 8).
+
+   WHAT IT IS. A SHIPWRIGHT block under SERVICES on the Market panel,
+   drawn only in port (EQUIPMENT §7's docked-only rule — the fuel and
+   hull rows breached it on purpose; this block does not). Four
+   batteries for the one mount, the escape pod, the Harbour Pilot and
+   the two hull classes. Every row is an ACTION with a price: it
+   validates, writes state, saves once and signals. The three TUNE
+   buttons that handed these over for nothing stay, as dev controls.
+
+   PRICES, in tenths of a credit, FROM THE SPEC WHERE THIS FILE QUOTES
+   IT: 6-pounders 4000 (EQUIPMENT §5.3, quoted at devFitLaser), escape
+   pod 10000 at minTech 6 (§5.2, quoted at devFitPod), Harbour Pilot
+   minTech 10 (PANEL §8's example). THE REST ARE [ASSUMED] — the spec
+   is in the space game's project, not this one, and its two quoted
+   prices are Elite's own (1984), so Elite's are used for the others
+   until the spec is read: swivels 8000 (the mining laser), 12-pounders
+   10000 (beam), 24-pounders 60000 (military), Pilot 15000. 12-pounders
+   at TL >= 8, where the pirates carry them (TUNING_s02). Hull prices
+   have no spec row at all: Sloop 25000, Galleon 60000, [ASSUMED] —
+   a Galleon is ~50 danger-6 bounties, about what Elite asked of a
+   Cobra's first real refit. One table, one place to change.
+
+   THE FEE RULE, his, as two straight lines through his anchors:
+     transfer fee  = 35 - 2.5 x TL  per cent, 10..30  (TL 4 25 %, TL 8 15 %)
+     new-kit markup = 2.5 x (TL - 4) per cent, 0..25  (TL 4 list, TL 8 +10 %)
+   The markup's anchors are [ASSUMED] (he gave the direction, not the
+   figures); the fee's two anchors are his.
+     BUY a module:  pays list x (1 + markup). A battery already on the
+                    mount comes off and is credited at list x (1 - fee)
+                    in the same transaction — the uninstall.
+     SELL a module: credits list x (1 - fee).
+     TRADE a hull:  pays the new hull's list x (1 + markup), credited
+                    the old hull at list x (1 - fee) LESS the repair of
+                    its missing points at HULL_UNIT_PRICE, LESS the
+                    transfer fee on every fitted module (fee x list).
+                    The new ship is fresh (devSetShip()'s rule: all
+                    five maxima), cargo and fittings ride, speed and
+                    docked are carried. An over-full hold Galleon ->
+                    Sloop is the legal state devSetShip() names.
+   Nothing here can be reached at hull 0 (no panel on the death screen)
+   and nothing here writes hull down.
+   `swLast` is a receipt, not saved — svcHullLast's rule.
+   NOTHING HERE HAS RUN ON A DEVICE. [BUILT] 30 October 2026, headless.
+   ================================================================== */
+const SW_BATTERIES = Object.freeze([
+  Object.freeze({ key:"mining",   id:"miningLaserFore",   name:"Swivel guns",  price:8000,  minTech:1  }),  /* [ASSUMED] Elite's mining laser */
+  Object.freeze({ key:"pulse",    id:"pulseLaserFore",    name:"6-pounders",   price:4000,  minTech:1  }),  /* EQUIPMENT §5.3 */
+  Object.freeze({ key:"beam",     id:"beamLaserFore",     name:"12-pounders",  price:10000, minTech:8  }),  /* [ASSUMED] price; TL 8 is the pirates' */
+  Object.freeze({ key:"military", id:"militaryLaserFore", name:"24-pounders",  price:60000, minTech:10 })   /* [ASSUMED] both */
+]);
+const SW_MODULES = Object.freeze({
+  escapePod:       Object.freeze({ id:"escapePod",       name:"Escape pod",    price:10000, minTech:6  }),  /* EQUIPMENT §5.2 */
+  dockingComputer: Object.freeze({ id:"dockingComputer", name:"Harbour Pilot", price:15000, minTech:10 })   /* minTech PANEL §8; price [ASSUMED] */
+});
+const SW_HULLS = Object.freeze({
+  shipWren: Object.freeze({ price:25000, minTech:1 }),   /* [ASSUMED] */
+  shipDray: Object.freeze({ price:60000, minTech:6 })    /* [ASSUMED] */
+});
+const SW_ROW = "sw:";
+let swLast = null;
+
+function swTech(){ return state.system.techLevel; }
+function swFeePct(){    return Math.min(30, Math.max(10, 35 - 2.5*swTech())); }
+function swMarkupPct(){ return Math.min(25, Math.max(0, 2.5*(swTech() - 4))); }
+function swBuyPrice(list){  return Math.round(list * (1 + swMarkupPct()/100)); }
+function swSellPrice(list){ return Math.round(list * (1 - swFeePct()/100)); }
+function swOpen(){ return !!state.ship.docked && state.ship.hull > 0; }
+
+/* what the mount holds, as a battery row, or null */
+function swFittedBattery(){
+  const k = foreLaser();
+  return k ? SW_BATTERIES.find(function(b){ return b.key === k; }) || null : null;
+}
+function swModuleFitted(id){ const e = state.equipment[id]; return !!(e && e.qty > 0); }
+/* list price of every fitted module the Shipwright knows — the transfer base */
+function swFittedList(){
+  let t = 0;
+  const b = swFittedBattery(); if(b) t += b.price;
+  for(const id of Object.keys(SW_MODULES)) if(swModuleFitted(id)) t += SW_MODULES[id].price;
+  return t;
+}
+
+/* ---- quotes: every figure the panel prints comes from one of these,
+   and the action re-reads the same quote, so the figure line and the
+   charge cannot disagree. reasons[] is why CONFIRM is held. ---- */
+function swQuoteBattery(b){
+  const fitted = swFittedBattery(), reasons = [];
+  const cost   = swBuyPrice(b.price);
+  const credit = fitted && fitted.key !== b.key ? swSellPrice(fitted.price) : 0;
+  const net    = cost - credit;
+  if(!swOpen()) reasons.push("port");
+  if(swTech() < b.minTech) reasons.push("tech");
+  if(fitted && fitted.key === b.key) reasons.push("fitted");
+  if(net > state.commander.credits) reasons.push("credits");
+  return { cost:cost, credit:credit, net:net, reasons:reasons, fitted:!!(fitted && fitted.key === b.key) };
+}
+function swQuoteModule(m){
+  const reasons = [], cost = swBuyPrice(m.price);
+  if(!swOpen()) reasons.push("port");
+  if(swTech() < m.minTech) reasons.push("tech");
+  if(swModuleFitted(m.id)) reasons.push("fitted");
+  if(cost > state.commander.credits) reasons.push("credits");
+  return { cost:cost, net:cost, credit:0, reasons:reasons, fitted:swModuleFitted(m.id) };
+}
+function swQuoteSell(list){
+  const reasons = [];
+  if(!swOpen()) reasons.push("port");
+  return { credit:swSellPrice(list), reasons:reasons };
+}
+function swQuoteHull(cls){
+  const cur = state.ship.class, reasons = [];
+  const want = SW_HULLS[cls], have = SW_HULLS[cur];
+  const cost     = swBuyPrice(want.price);
+  const repair   = (SHIPS[cur].hullMax - state.ship.hull) * HULL_UNIT_PRICE;
+  const tradeIn  = Math.max(0, swSellPrice(have.price) - repair);
+  const transfer = Math.round(swFittedList() * swFeePct()/100);
+  const net      = cost - tradeIn + transfer;
+  if(!swOpen()) reasons.push("port");
+  if(cls === cur) reasons.push("aboard");
+  if(swTech() < want.minTech) reasons.push("tech");
+  if(net > state.commander.credits) reasons.push("credits");
+  return { cost:cost, repair:repair, tradeIn:tradeIn, transfer:transfer, net:net, reasons:reasons, aboard:cls === cur };
+}
+
+/* ---- the actions. noCascade(), validate, write, save once, signal. ---- */
+function swReceipt(kind, what, net){
+  swLast = { kind:kind, what:what, net:net, at:state.system.name, tl:swTech(), fee:swFeePct(), markup:swMarkupPct() };
+}
+function buyBattery(key){
+  noCascade();
+  const b = SW_BATTERIES.find(function(x){ return x.key === key; });
+  if(!b) return fail(["id"]);
+  const q = swQuoteBattery(b);
+  if(q.reasons.length) return fail(q.reasons);
+  const was = swFittedBattery();
+  if(was) delete state.equipment[was.id];
+  state.equipment[b.id] = { qty:1 };
+  state.commander.credits -= q.net;
+  swReceipt("battery", b.name+(was ? " for "+was.name : ""), q.net);
+  saveGame();
+  stateChanged("buyBattery");
+  return { ok:true };
+}
+function sellBattery(){
+  noCascade();
+  const b = swFittedBattery();
+  if(!b) return fail(["none"]);
+  const q = swQuoteSell(b.price);
+  if(q.reasons.length) return fail(q.reasons);
+  delete state.equipment[b.id];
+  state.commander.credits += q.credit;
+  swReceipt("sold", b.name, -q.credit);
+  saveGame();
+  stateChanged("sellBattery");
+  return { ok:true };
+}
+function buyModule(id){
+  noCascade();
+  const m = SW_MODULES[id];
+  if(!m) return fail(["id"]);
+  const q = swQuoteModule(m);
+  if(q.reasons.length) return fail(q.reasons);
+  state.equipment[m.id] = { qty:1 };
+  state.commander.credits -= q.net;
+  swReceipt("module", m.name, q.net);
+  saveGame();
+  stateChanged("buyModule");
+  return { ok:true };
+}
+function sellModule(id){
+  noCascade();
+  const m = SW_MODULES[id];
+  if(!m || !swModuleFitted(id)) return fail(["none"]);
+  const q = swQuoteSell(m.price);
+  if(q.reasons.length) return fail(q.reasons);
+  delete state.equipment[m.id];
+  state.commander.credits += q.credit;
+  swReceipt("sold", m.name, -q.credit);
+  saveGame();
+  stateChanged("sellModule");
+  return { ok:true };
+}
+function buyHullClass(cls){
+  noCascade();
+  if(!knownShip(cls) || !SW_HULLS[cls]) return fail(["id"]);
+  const q = swQuoteHull(cls);
+  if(q.reasons.length) return fail(q.reasons);
+  const was = state.ship;
+  state.ship = freshShip(cls);                 /* devSetShip()'s rule: all five maxima */
+  state.ship.cargoUsed = holdUsed();           /* cargo rides; over-full is legal */
+  state.ship.speed  = was.speed;
+  state.ship.docked = was.docked;
+  state.commander.credits -= q.net;
+  inF = 0; inA = 0; rcE = 0; rcF = 0; rcA = 0; /* the parts of a point belonged to the old hull */
+  swReceipt("hull", SHIP_NAME[cls]+" for "+SHIP_NAME[was.class], q.net);
+  shipChanged();                               /* the new class's three rates */
+  saveGame();
+  stateChanged("buyHull");
+  return { ok:true };
+}
+function swReportLine(){
+  const here = "here TL "+swTech()+": new kit +"+swMarkupPct()+"%, fee "+swFeePct()+"%  ·  fitted list "+cr(swFittedList())+" CR";
+  if(!swLast) return here+"  ·  none this session";
+  const f = swLast;
+  return here+"  ·  last: "+f.kind+" "+f.what+" "+(f.net >= 0 ? "paid "+cr(f.net) : "credited "+cr(-f.net))+" CR at "+f.at+" (TL "+f.tl+")";
+}
+
+
 /* LOOP 59, session 020. This derived category from the sign of ef and
    special-cased salvage by id. WORLD MODEL §7.1 says category is world
    data and is NOT derived, and gives the reason: PANEL §3.2 fixes the
@@ -9902,6 +10125,18 @@ function renderMarket(){
        '</button>';
   if(hOpen) h += svcHullExpansion();
 
+  /* SEA-G. THE SHIPWRIGHT, under SERVICES — appended, as fuel and hull
+     were, so no learned row moves (PANEL §3.2). Ignores HOLD ONLY for
+     their reason. In port only: at sea the block is one line saying so,
+     not a list of rows that refuse. */
+  h += '<div class="mcat">SHIPWRIGHT</div>';
+  if(!swOpen()){
+    h += '<div class="mempty">In port only \u2014 make harbour to refit. '+
+         'Here TL '+swTech()+': new kit +'+swMarkupPct()+'%, moving or selling kit \u2212'+swFeePct()+'%.</div>';
+  } else {
+    h += swRows();
+  }
+
   h += '<div class="phead">MUNGO\u2019S ASSESSMENT</div>';
   h += '<div class="pmungo">ai.mungo not installed \u2014 no assessment '+
        'available. The prices above are read from the world model and '+
@@ -9926,6 +10161,98 @@ function renderMarket(){
    sits above it when you hold stock.
    "not opened" is the `chart canvas` rule, loop 51: no row has been
    expanded this session and any number here would be a lie. */
+/* SEA-G. One row per thing the Shipwright sells. Columns are the
+   market's: name · price here · the gate (TL n) or — · FITTED/ABOARD.
+   The open row's expansion is the fuel row's shape with no stepper —
+   a battery is one, a hull is one — so: figure line, then CONFIRM(s).
+   Every figure on the line is the quote the action will re-read. */
+function swRowBtn(id, name, price, gateTl, mark){
+  const on = (mktOpen === id);
+  return '<button class="mrow'+(on?' on':'')+'" data-row="'+id+'">'+
+         '<span class="mn">'+name+'</span>'+
+         '<span class="mp">'+cr(price)+'</span>'+
+         '<span class="ma">'+(gateTl ? 'TL '+gateTl : '\u2014')+'</span>'+
+         '<span class="mh">'+(mark || '\u2014')+'</span>'+
+         '</button>';
+}
+function swWhy(reasons){
+  const w = [];
+  if(reasons.indexOf("tech")    !== -1) w.push('not sold at this tech level');
+  if(reasons.indexOf("credits") !== -1) w.push('cannot afford it');
+  if(reasons.indexOf("fitted")  !== -1) w.push('already fitted');
+  if(reasons.indexOf("aboard")  !== -1) w.push('the ship you are in');
+  return w.length ? ' \u00b7 '+w.join(' \u00b7 ') : '';
+}
+function swRows(){
+  let h = '';
+  const tl = swTech();
+  for(const b of SW_BATTERIES){
+    const id = SW_ROW+"bat:"+b.key, q = swQuoteBattery(b);
+    h += swRowBtn(id, b.name, swBuyPrice(b.price), tl < b.minTech ? b.minTech : 0, q.fitted ? 'FITTED' : '');
+    if(mktOpen === id) h += swBatteryExpansion(b, q);
+  }
+  for(const mid of Object.keys(SW_MODULES)){
+    const m = SW_MODULES[mid], id = SW_ROW+"mod:"+mid, q = swQuoteModule(m);
+    h += swRowBtn(id, m.name, swBuyPrice(m.price), tl < m.minTech ? m.minTech : 0, q.fitted ? 'FITTED' : '');
+    if(mktOpen === id) h += swModuleExpansion(m, q);
+  }
+  for(const cls of Object.keys(SW_HULLS)){
+    const hr = SW_HULLS[cls], id = SW_ROW+"hull:"+cls, q = swQuoteHull(cls);
+    h += swRowBtn(id, SHIP_NAME[cls]+' \u00b7 hull '+SHIPS[cls].hullMax+' hold '+SHIPS[cls].holdTonnes+'t',
+                  swBuyPrice(hr.price), tl < hr.minTech ? hr.minTech : 0, q.aboard ? 'ABOARD' : '');
+    if(mktOpen === id) h += swHullExpansion(cls, q);
+  }
+  return h;
+}
+function swBatteryExpansion(b, q){
+  const L = LASERS[b.key];
+  let h = '<div class="mexp">';
+  h += '<div class="mfig">'+L.balls+' guns a side \u00b7 '+L.damage+' a ball \u00b7 reload '+(1/L.rate).toFixed(1)+' s \u00b7 '+
+       L.energy+' powder \u00b7 lays to '+L.range+' u</div>';
+  if(q.fitted){
+    const sq = swQuoteSell(b.price);
+    h += '<div class="mgrp"><div class="mfig">SELL \u00b7 credits '+cr(sq.credit)+' CR (list '+cr(b.price)+' less '+swFeePct()+'% fee) \u00b7 leaves the mount empty</div>'+
+         '<button class="mconf" data-act="swsell">CONFIRM SALE</button></div>';
+  } else {
+    h += '<div class="mgrp"><div class="mfig">BUY \u00b7 cost '+cr(q.cost)+' CR'+
+         (q.credit ? ' less '+cr(q.credit)+' CR for the '+swFittedBattery().name+' coming off' : '')+
+         ' \u00b7 net '+cr(q.net)+' CR \u00b7 you have '+cr(state.commander.credits)+' CR'+swWhy(q.reasons)+'</div>'+
+         '<button class="mconf" data-act="swbuy" '+(q.reasons.length?'disabled':'')+'>CONFIRM PURCHASE</button></div>';
+  }
+  return h + '</div>';
+}
+function swModuleExpansion(m, q){
+  let h = '<div class="mexp">';
+  const what = m.id === "escapePod"
+    ? 'Hull 0 takes to the boats instead of losing the captain \u00b7 used up on the day'
+    : 'Makes port for you from '+DC_RANGE+' u \u00b7 the DOCK button';
+  h += '<div class="mfig">'+what+'</div>';
+  if(q.fitted){
+    const sq = swQuoteSell(m.price);
+    h += '<div class="mgrp"><div class="mfig">SELL \u00b7 credits '+cr(sq.credit)+' CR (list '+cr(m.price)+' less '+swFeePct()+'% fee)</div>'+
+         '<button class="mconf" data-act="swsell">CONFIRM SALE</button></div>';
+  } else {
+    h += '<div class="mgrp"><div class="mfig">BUY \u00b7 cost '+cr(q.cost)+' CR \u00b7 you have '+cr(state.commander.credits)+' CR'+swWhy(q.reasons)+'</div>'+
+         '<button class="mconf" data-act="swbuy" '+(q.reasons.length?'disabled':'')+'>CONFIRM PURCHASE</button></div>';
+  }
+  return h + '</div>';
+}
+function swHullExpansion(cls, q){
+  const r = SHIPS[cls];
+  let h = '<div class="mexp">';
+  h += '<div class="mfig">Speed '+r.maxSpeed+' \u00b7 helm '+r.rollRate+'\u00b0/s \u00b7 hull '+r.hullMax+' \u00b7 hold '+r.holdTonnes+' t'+
+       (q.aboard ? ' \u00b7 the ship you are in' : '')+'</div>';
+  if(!q.aboard){
+    h += '<div class="mgrp"><div class="mfig">TRADE \u00b7 cost '+cr(q.cost)+' CR \u00b7 your '+SHIP_NAME[state.ship.class]+' in part exchange '+cr(q.tradeIn)+' CR'+
+         (q.repair ? ' (less '+cr(q.repair)+' CR of repair)' : '')+
+         ' \u00b7 moving your fittings '+cr(q.transfer)+' CR ('+swFeePct()+'%)'+
+         ' \u00b7 net '+cr(q.net)+' CR \u00b7 you have '+cr(state.commander.credits)+' CR'+swWhy(q.reasons)+'</div>'+
+         '<div class="mfig">Cargo and fittings come across \u00b7 the new hull is whole</div>'+
+         '<button class="mconf" data-act="swbuy" '+(q.reasons.length?'disabled':'')+'>CONFIRM TRADE</button></div>';
+  }
+  return h + '</div>';
+}
+
 function measureMfig(){
   const grps = mktBody.querySelectorAll('.mexp .mgrp');
   if(!grps.length) return;                  /* no row open: keep the last reading */
@@ -9935,7 +10262,9 @@ function measureMfig(){
   if(hpx <= 0) return;                      /* rendered while the panel was closed */
   const cs = getComputedStyle(el);
   mfigChars = el.textContent.length;
-  mfigRow   = mktOpen === FUEL_ROW_ID ? "Fuel" : mktOpen === HULL_ROW_ID ? "Hull" : (commodityById(mktOpen)||{name:"?"}).name; /* 061a S145; 102a Hull */
+  mfigRow   = mktOpen === FUEL_ROW_ID ? "Fuel" : mktOpen === HULL_ROW_ID ? "Hull" :
+              (typeof mktOpen === "string" && mktOpen.indexOf(SW_ROW) === 0) ? "Shipwright "+mktOpen.slice(SW_ROW.length) :
+              (commodityById(mktOpen)||{name:"?"}).name; /* 061a S145; 102a Hull; sea-g Shipwright */
   mfigH     = Math.round(hpx);
   mfigLineH = Math.round(parseFloat(cs.lineHeight) +
                          parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom));
@@ -10290,6 +10619,25 @@ mktBody.addEventListener("click", function(e){
       if(ha === "b+")   mktBuyQ = Math.min(hmx, mktBuyQ+1);
       if(ha === "bmax") mktBuyQ = hmx;
       if(ha === "buy"){ buyHull(mktBuyQ); mktBuyQ = 0; }
+      renderMarket();
+      return;
+    }
+    /* SEA-G. The Shipwright's rows, handled before the commodity lookup
+       for the fuel row's reason. One tap, one action; the panel is
+       redrawn from state after it, so a refused action shows nothing
+       changed and the figure line says why. */
+    if(typeof mktOpen === "string" && mktOpen.indexOf(SW_ROW) === 0){
+      const sa = act.getAttribute("data-act");
+      const parts = mktOpen.slice(SW_ROW.length).split(":");     /* bat:key · mod:id · hull:cls */
+      if(parts[0] === "bat"){
+        if(sa === "swbuy")  buyBattery(parts[1]);
+        if(sa === "swsell") sellBattery();
+      } else if(parts[0] === "mod"){
+        if(sa === "swbuy")  buyModule(parts[1]);
+        if(sa === "swsell") sellModule(parts[1]);
+      } else if(parts[0] === "hull"){
+        if(sa === "swbuy")  buyHullClass(parts[1]);
+      }
       renderMarket();
       return;
     }
