@@ -6945,11 +6945,11 @@ function drawIsland(o, C, rel, hw, hh, isHarbour){
       const zm = Math.max(NEAR, (A[2]+B[2])/2);
       const beat = 0.5 + 0.5*Math.sin(seaT*1.7 + ph0 + i*1.9);
       const a = (0.35 + 0.55*beat) * (1 - hz*0.5);
-      ctx.lineWidth = Math.max(1, F*(2.5+2*beat)/zm);
+      ctx.lineWidth = Math.min(5, Math.max(1, F*(2.5+2*beat)/zm))   /* capped: Ripley 21:43, a slab of white alongside */;
       ctx.strokeStyle = "rgba(236,242,248,"+a.toFixed(2)+")";
       ctx.beginPath(); segCam(A, B, hw, hh); ctx.stroke();
       if(zm < 700){                                /* close in: the foam spreading over the sand */
-        ctx.lineWidth = Math.max(1, F*(6+4*beat)/zm);
+        ctx.lineWidth = Math.min(12, Math.max(1, F*(6+4*beat)/zm));
         ctx.strokeStyle = "rgba(236,242,248,"+(0.16*beat*(1-zm/700)).toFixed(2)+")";
         ctx.beginPath(); segCam(A, B, hw, hh); ctx.stroke(); }
     }
