@@ -53,13 +53,13 @@
   }
   #app{
     display:flex;flex-direction:column;
-    height:100dvh;height:100vh;
+    height:100vh;height:100dvh;   /* sea-h: dvh LAST so it wins where it exists — it read the other way round */
     padding-top:env(safe-area-inset-top);
     padding-bottom:env(safe-area-inset-bottom);
   }
 
   /* ---- 3D view ---- */
-  .view{flex:1 1 auto;min-height:0;position:relative;background:#000;}
+  .view{flex:1 1 auto;min-height:0;position:relative;background:#000;overflow:hidden;}   /* sea-h: the canvas can never paint past its box */
   .view canvas{display:block;width:100%;height:100%;}
   .viewedge{position:absolute;inset:0;border-bottom:1px solid var(--ink-faint);pointer-events:none;}
 
@@ -4050,25 +4050,44 @@ function arrivalPoint(galaxy, system, gameDay){
 /* ---------- canvas ---------- */
 const cv=document.getElementById("cv"), ctx=cv.getContext("2d",{alpha:false});
 let W=0,H=0,F=0,DPR=1;
+/* SEA-H, Ripley's screenshot 29 Oct 21:13 (iPhone, installed from the
+   repo, first run): the sea painted over the strip and the console,
+   the crow's nest cut off at the top. Cause: resize() gave both
+   canvases a PIXEL height from one measurement, and an installed PWA's
+   viewport settles after first paint without always firing `resize`
+   — so the canvas kept the tall figure, overflowed its box, and being
+   positioned painted over the bands. Now the sea canvas has no pixel
+   size of its own (CSS 100% of .view, which clips), the radar is sized
+   from its box, and frame() compares the box to the last measurement
+   every frame — a box that changes silently is re-measured on the next
+   frame. [BUILT] headless; the device is the test. */
 function resize(){
   const r=cv.parentElement.getBoundingClientRect();
   DPR=Math.min(window.devicePixelRatio||1,2);
   W=Math.max(1,Math.round(r.width)); H=Math.max(1,Math.round(r.height));
   cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR);
-  cv.style.width=W+"px"; cv.style.height=H+"px";
   ctx.setTransform(DPR,0,0,DPR,0,0);
   F = (H/2)/Math.tan(30*Math.PI/180);   // 60° vertical field of view
   resizeRadar();
 }
+function boxChanged(){
+  const r=cv.parentElement.getBoundingClientRect();
+  if(Math.round(r.width)!==W || Math.round(r.height)!==H) return true;
+  const b=rcv.parentElement.getBoundingClientRect(), l=rcv.previousElementSibling ? rcv.previousElementSibling.getBoundingClientRect().height : 0;
+  return Math.round(b.width)!==RW || Math.round(b.height-l)!==RH;
+}
 window.addEventListener("resize",resize);
 window.addEventListener("orientationchange",()=>setTimeout(resize,250));
+if(window.visualViewport) window.visualViewport.addEventListener("resize",resize);
+window.addEventListener("load",()=>{ resize(); setTimeout(resize,400); });
 
 /* ---------- radar canvas ---------- */
 const rcv=document.getElementById("radar"), rctx=rcv.getContext("2d",{alpha:false});
 let RW=0,RH=0;
 function resizeRadar(){
-  const r=rcv.getBoundingClientRect();
-  RW=Math.max(1,Math.round(r.width)); RH=Math.max(1,Math.round(r.height));
+  /* sea-h: from the BOX (the radarbox less its label), never from the canvas's own last size */
+  const b=rcv.parentElement.getBoundingClientRect(), l=rcv.previousElementSibling ? rcv.previousElementSibling.getBoundingClientRect().height : 0;
+  RW=Math.max(1,Math.round(b.width)); RH=Math.max(1,Math.round(b.height-l));
   rcv.width=Math.round(RW*DPR); rcv.height=Math.round(RH*DPR);
   rcv.style.width=RW+"px"; rcv.style.height=RH+"px";
   rctx.setTransform(DPR,0,0,DPR,0,0);
@@ -7379,6 +7398,7 @@ function frame(now){
 
   seaT += dt;                            /* SEA DOGS: the swell and the lamps keep time even while the world holds */
   lookStep(dt);
+  if(boxChanged()) resize();             /* sea-h: a viewport that settled without a resize event */
   render();
   drawRadar();
   paintConsole();
