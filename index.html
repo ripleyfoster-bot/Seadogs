@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#050709">
-<title>SEA DOGS sea-h — pirate reskin of ELITE: THE CLONES 110c</title>
+<title>SEA DOGS sea-i — pirate reskin of ELITE: THE CLONES 110c</title>
 <!-- S71, session 039. THREE BUILDS WERE PUBLISHED THIS SESSION READING
      037e. 039a, 039b and 039c each changed the report function and none
      bumped either marker, so S57's arrival check — read the header in
@@ -1349,12 +1349,12 @@
        §5.2 prices it at 1000.0 CR, minTech 6). devFitPod() carries the
        reasoning. -->
   <div class="row">
-    <div class="acts" style="margin-top:0"><button id="bPod">FIT ESCAPE POD</button></div>
-    <div class="note">Dev control, not a purchase. Fits <b>one escape pod</b> and saves at once.
-    <b>With a pod fitted, hull 0 does not lose the commander:</b> you eject, keep credits, legal
+    <div class="acts" style="margin-top:0"><button id="bPod">FIT LIFEBOAT (ESCAPE POD)</button></div>
+    <div class="note">Dev control, not a purchase. Fits <b>one lifeboat</b> (the escape pod) and saves at once.
+    <b>With a lifeboat aboard, hull 0 does not lose the captain:</b> you eject, keep credits, legal
     status, kills and the chart record, and <b>lose the ship, the cargo and every other fitting —
     the laser too</b>. You are put in a new Wren at this system's arrival point, <b>unarmed</b>, and
-    the pod is used up: fit another here, and the laser above. <b>It cannot be fitted to a
+    the lifeboat is used up: fit another here, and the laser above. <b>It cannot be fitted to a
     commander who is already lost</b> — REPAIR first. Every part of that is <b>[ASSUMED]</b>
     beyond COMBAT §8's own list.</div>
   </div>
@@ -6028,7 +6028,7 @@ function deathLine(){
   return (dead ? "COMMANDER LOST — "+(deathCause ? "by "+deathCause.by : "no cause on file")+
                  "  ·  the file holds hull 0 until KILL (a wipe, behind the slide) or REPAIR"
                : "alive")+
-         "  ·  escape pod "+(podFitted() ? "FITTED — hull 0 ejects (ruling 55)" : "not fitted — hull 0 loses the commander")+
+         "  ·  lifeboat "+(podFitted() ? "FITTED — hull 0 ejects (ruling 55)" : "not fitted — hull 0 loses the commander")+
          "  ·  last ejection: "+(lastEject
             ? new Date(lastEject.t).toTimeString().slice(0,8)+", "+(lastEject.lost.by ? "by "+lastEject.lost.by : "no cause")+
               " at "+lastEject.lost.name+" day "+lastEject.lost.day+" — lost "+ID_NS+":"+lastEject.lost.ship+", "+lastEject.lost.cargo+" t, "+
@@ -7688,8 +7688,8 @@ function syncDev(){
     : "FIT PULSE LASER — FORE MOUNT";
   /* 100a. Both labels are read from state, as the laser's is. */
   document.getElementById("bPod").textContent = podFitted()
-    ? "ESCAPE POD: "+ID_NS+":escapePod — FITTED"
-    : (state.ship.hull <= 0 ? "FIT ESCAPE POD — NOT ON A LOST COMMANDER: REPAIR FIRST" : "FIT ESCAPE POD");
+    ? "LIFEBOAT: "+ID_NS+":escapePod — ABOARD"
+    : (state.ship.hull <= 0 ? "FIT LIFEBOAT — NOT ON A LOST CAPTAIN: REPAIR FIRST" : "FIT LIFEBOAT");
   document.getElementById("bRepair").textContent =
     "REPAIR — HULL "+state.ship.hull+" OF "+row.hullMax+(state.ship.hull <= 0 ? " · COMMANDER LOST: THIS UNDOES IT" : "");
   /* 107a, ruling 66. Read from state, as the pod's is. */
@@ -7986,7 +7986,7 @@ function overrideLine(){
 }
 function writeReport(){
   lastReport =
-    "SEA DOGS sea-h — pirate reskin of ELITE: THE CLONES 110c — settings\n"+   /* 109b, S353: this line read 108f in 109a — the one marker the title tag did not move. 110a: both markers grepped before export (s110 §0) */
+    "SEA DOGS sea-i — pirate reskin of ELITE: THE CLONES 110c — settings\n"+   /* 109b, S353: this line read 108f in 109a — the one marker the title tag did not move. 110a: both markers grepped before export (s110 §0) */
     "deadzone      "+T.dead+" px  (spec 6)\n"+
     "deflection    "+T.defl+" px  (spec 55)\n"+
     "exponent      "+T.exp.toFixed(1)+"     (spec 1.6)\n"+
@@ -10026,15 +10026,20 @@ function svcHullReportLine(){
    `swLast` is a receipt, not saved — svcHullLast's rule.
    NOTHING HERE HAS RUN ON A DEVICE. [BUILT] 30 October 2026, headless.
    ================================================================== */
+/* sea-i, session 05 (31 Oct 2026): CHECKED AGAINST EQUIPMENT LIST SPEC v1.3 §5.
+   Every price matched. Three minTech gates did not and were corrected here:
+   swivels 1 -> 5, 6-pounders 1 -> 3, 24-pounders 10 -> 12. The spec itself
+   marks every §5 price [ASSUMED] (its §4.4: a ladder, not a measurement), so
+   the figures are now "as the spec stands", which is decision (a) above. */
 const SW_BATTERIES = Object.freeze([
-  Object.freeze({ key:"mining",   id:"miningLaserFore",   name:"Swivel guns",  price:8000,  minTech:1  }),  /* [ASSUMED] Elite's mining laser */
-  Object.freeze({ key:"pulse",    id:"pulseLaserFore",    name:"6-pounders",   price:4000,  minTech:1  }),  /* EQUIPMENT §5.3 */
-  Object.freeze({ key:"beam",     id:"beamLaserFore",     name:"12-pounders",  price:10000, minTech:8  }),  /* [ASSUMED] price; TL 8 is the pirates' */
-  Object.freeze({ key:"military", id:"militaryLaserFore", name:"24-pounders",  price:60000, minTech:10 })   /* [ASSUMED] both */
+  Object.freeze({ key:"mining",   id:"miningLaserFore",   name:"Swivel guns",  price:8000,  minTech:5  }),  /* EQUIPMENT v1.3 §5.3 */
+  Object.freeze({ key:"pulse",    id:"pulseLaserFore",    name:"6-pounders",   price:4000,  minTech:3  }),  /* EQUIPMENT v1.3 §5.3 */
+  Object.freeze({ key:"beam",     id:"beamLaserFore",     name:"12-pounders",  price:10000, minTech:8  }),  /* EQUIPMENT v1.3 §5.3 — agrees with TUNING_s02's TL 8 */
+  Object.freeze({ key:"military", id:"militaryLaserFore", name:"24-pounders",  price:60000, minTech:12 })   /* EQUIPMENT v1.3 §5.3 */
 ]);
 const SW_MODULES = Object.freeze({
-  escapePod:       Object.freeze({ id:"escapePod",       name:"Escape pod",    price:10000, minTech:6  }),  /* EQUIPMENT §5.2 */
-  dockingComputer: Object.freeze({ id:"dockingComputer", name:"Harbour Pilot", price:15000, minTech:10 })   /* minTech PANEL §8; price [ASSUMED] */
+  escapePod:       Object.freeze({ id:"escapePod",       name:"Lifeboat",      price:10000, minTech:6  }),  /* EQUIPMENT v1.3 §5.2 */
+  dockingComputer: Object.freeze({ id:"dockingComputer", name:"Harbour Pilot", price:15000, minTech:10 })   /* EQUIPMENT v1.3 §5.2 */
 });
 const SW_HULLS = Object.freeze({
   shipWren: Object.freeze({ price:25000, minTech:1 }),   /* [ASSUMED] */
