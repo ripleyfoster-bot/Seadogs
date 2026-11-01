@@ -1571,7 +1571,7 @@
    THIS IS THE ONLY PLACE THE ID IS WRITTEN: the <title> and the TUNE report header
    both read it. Bump this line and nothing else. The delivered file carries it as a
    suffix (index_sea-j_v1.1.html); the repo holds index.html. */
-const BUILD = "sea-j · v1.2";
+const BUILD = "sea-j · v1.3";
 document.title = "SEA DOGS "+BUILD+" — pirate reskin of ELITE: THE CLONES 110c";
 
 /* ------------------------------------------------------------------
@@ -7338,11 +7338,11 @@ function render(){
       const wl = qrot(qconj(q), wind.dir);
       if(Math.abs(wl[0]) > 0.12) jibSide = wl[0] > 0 ? 1 : -1;
       const lee = jibSide, belly = 0.35 + 0.65*Math.min(1, Math.abs(wl[0]));
-      const TACK = [0,11,39], HEAD = [0,32.5,6], CLEW = [lee*10.5,6.8,-10], B = lee*(5+9*belly);
+      const TACK = [0,11,39], HEAD = [0,32.5,6], CLEW = [lee*10.5,6.8,-8], B = lee*(1.2+2.4*belly);   /* v1.3: the belly cut to a quarter — v1.2's bowed the leech into a fourth side ("triangular, rather than rectangular looking", Ripley, 10:38) */
       const along = function(a,b,t,bx,by){ const s = Math.sin(Math.PI*t); return [a[0]+(b[0]-a[0])*t + bx*s, a[1]+(b[1]-a[1])*t + by*s, a[2]+(b[2]-a[2])*t]; };
       const N = 6, leech = [], foot = [];
       for(let i=1;i<N;i++) leech.push(along(HEAD, CLEW, i/N, B, 0));
-      for(let i=1;i<N;i++) foot.push(along(CLEW, TACK, i/N, B*0.45, -1.6));
+      for(let i=1;i<N;i++) foot.push(along(CLEW, TACK, i/N, B*0.45, -0.6));
       const poly = [TACK, HEAD].concat(leech, [CLEW], foot).map(pt);
       if(pathCam(poly, hw, hh)){ ctx.fillStyle = rgb(SAIL_RGB, 0.94); ctx.fill();
         /* the bolt-rope */
