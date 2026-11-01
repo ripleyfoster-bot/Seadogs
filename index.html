@@ -1287,6 +1287,13 @@
     <div class="note">How long the fly-through into the station and the iris out of it take.
       <b>3.1 is your figure, ruling 67</b> — read off the mock, not the game. Out of 0.5–4 flies as 3.1.</div>
   </div>
+  <!-- sea-j v2.0, OL-18 ([DECISION], Ripley, 1 Nov 2026): the jib fades under way. -->
+  <div class="row">
+    <label>Sail fade <i><span id="vJf"></span> s</i></label>
+    <input type="range" id="sJf" min="0" max="3.5" step="0.1">
+    <div class="note">The jib goes to a ghost while the ship has way on or the helm or the look is touched, and comes back solid when stopped with no input or in port. This is how long each change takes.
+      <b>0 = always solid · 3.5 = always transparent</b> · between, the fade's length. <b>1.5 is your figure, [ASSUMED]</b>. The spar and the stays never fade.</div>
+  </div>
   <div class="toggles">
     <button id="tRefill">SHIPS' SHIELDS REFILL</button>
     <button id="bPadFire">PAD FIRE</button>
@@ -1571,7 +1578,7 @@
    THIS IS THE ONLY PLACE THE ID IS WRITTEN: the <title> and the TUNE report header
    both read it. Bump this line and nothing else. The delivered file carries it as a
    suffix (index_sea-j_v1.1.html); the repo holds index.html. */
-const BUILD = "sea-j · v1.3";
+const BUILD = "sea-j · v2.0";
 document.title = "SEA DOGS "+BUILD+" — pirate reskin of ELITE: THE CLONES 110c";
 
 /* ------------------------------------------------------------------
@@ -1665,6 +1672,12 @@ const SPEC = { dead:6, defl:55, exp:1.6,
                                             pair (12/10) is NOT applied: this build has no input class to choose by
                                             (S334, [ASSUMED]). NEW KEYS: a stored tuning from 105a has none and reads
                                             these. All three [ASSUMED]; slotTol() validates, the report says. */
+               sailFade:1.5,             /* sea-j v2.0, OL-18 ([DECISION], Ripley, 1 Nov 2026): seconds the jib takes
+                                            to fade when the ship is under way or the helm/look is touched, and to
+                                            come back solid when stopped with no input or in port. 0 = always solid;
+                                            3.5 (the slider's top) = always transparent; between, the transition's
+                                            length, as a slider not steps — his spec. 1.5 is his figure. NEW KEY: a
+                                            stored tuning from v1.x has none and reads this. sailFade() validates. */
                transitionSec:3.1,        /* 108a, LOOP 126, RULING 67 ([DECISION], Ripley, 108): the length of the
                                             dock and launch transitions, seconds. HIS FIGURE, read off the mock
                                             (sim_loop126) on his phone; still a guess about the game, on a TUNE
@@ -6649,6 +6662,10 @@ function wrap(v){ const m=((v+CELL)%(2*CELL)+2*CELL)%(2*CELL)-CELL; return m; }
 const CAM_H = 24, CAM_PITCH = 7*Math.PI/180, DRAW_RANGE = CELL*1.35, LOOK_DEG = 80, LOOK_RATE = 260*Math.PI/180;
 let seaT = 0, lookOff = 0;
 let jibSide = 1;                            /* sea-j, OL-16: which rail the jib is sheeted to, +1 starboard. Runtime, never saved */
+let sailAlpha = 1, sailLastT = 0, sailWay = false;   /* sea-j v2.0, OL-18: the jib's opacity, where it is now; runtime, never saved */
+const SAIL_CLEAR = 0.12;                    /* the ghost: what "transparent" means, [ASSUMED] */
+function sailFade(){ const v = T.sailFade; return (typeof v === "number" && v >= 0 && v <= 3.5) ? v : SPEC.sailFade; }
+function sailFadeLine(){ const f = sailFade(); return (f <= 0 ? "always solid" : f >= 3.5 ? "always transparent" : f.toFixed(1)+" s each way")+"  ·  ghost "+Math.round(SAIL_CLEAR*100)+"%  ·  now "+Math.round(sailAlpha*100)+"% "+(sailWay ? "(under way / input)" : "(stopped / in port)")+"  [ASSUMED] sea-j v2.0"; }
 const INK = [233,207,143];
 const SKY_TOP = [8,12,30], SKY_HOR = [58,78,122], SKY_WARM = [122,92,86];
 const SEA_HOR = [34,58,92], SEA_BOT = [8,22,40], HAZE = [58,78,122];
@@ -7338,11 +7355,24 @@ function render(){
       const wl = qrot(qconj(q), wind.dir);
       if(Math.abs(wl[0]) > 0.12) jibSide = wl[0] > 0 ? 1 : -1;
       const lee = jibSide, belly = 0.35 + 0.65*Math.min(1, Math.abs(wl[0]));
-      const TACK = [0,11,39], HEAD = [0,32.5,6], CLEW = [lee*10.5,6.8,-8], B = lee*(1.2+2.4*belly);   /* v1.3: the belly cut to a quarter — v1.2's bowed the leech into a fourth side ("triangular, rather than rectangular looking", Ripley, 10:38) */
+      /* v1.3: the belly cut to a quarter — v1.2's bowed the leech into a fourth side ("triangular, rather than
+         rectangular looking", Ripley, 10:38). v2.0: BIGGER, to his sketch (10:42) — head near the masthead, clew
+         well aft at the rail by the second gun, the leech bowed out — "bigger then fade as discussed". */
+      const TACK = [0,11,39], HEAD = [0,37,-1], CLEW = [lee*11,6.5,-30], B = lee*(3+5*belly);
+      /* OL-18 — THE FADE. Under way (speed, helm, pad down, head turned) the sail goes to its ghost; stopped
+         with no input, or in port, it comes back. T.sailFade is the time each way; 0 pins it solid, 3.5 pins it
+         clear. Stepped on seaT so it runs while the world holds. */
+      { const dt = Math.max(0, Math.min(0.1, seaT - sailLastT)); sailLastT = seaT;
+        const f = sailFade();
+        sailWay = !state.ship.docked && (speed > 0.5 || padId !== null || !!(keys["arrowleft"] || keys["arrowright"] || keys["a"] || keys["d"]) || Math.abs(lookOff) > 0.01);
+        const target = f <= 0 ? 1 : f >= 3.5 ? SAIL_CLEAR : (sailWay ? SAIL_CLEAR : 1);
+        const step = (1 - SAIL_CLEAR) * dt / Math.max(0.3, Math.min(f, 3.4));
+        sailAlpha += Math.max(-step, Math.min(step, target - sailAlpha)); }
+      ctx.globalAlpha = sailAlpha;
       const along = function(a,b,t,bx,by){ const s = Math.sin(Math.PI*t); return [a[0]+(b[0]-a[0])*t + bx*s, a[1]+(b[1]-a[1])*t + by*s, a[2]+(b[2]-a[2])*t]; };
       const N = 6, leech = [], foot = [];
       for(let i=1;i<N;i++) leech.push(along(HEAD, CLEW, i/N, B, 0));
-      for(let i=1;i<N;i++) foot.push(along(CLEW, TACK, i/N, B*0.45, -0.6));
+      for(let i=1;i<N;i++) foot.push(along(CLEW, TACK, i/N, B*0.45, -0.8));
       const poly = [TACK, HEAD].concat(leech, [CLEW], foot).map(pt);
       if(pathCam(poly, hw, hh)){ ctx.fillStyle = rgb(SAIL_RGB, 0.94); ctx.fill();
         /* the bolt-rope */
@@ -7360,10 +7390,11 @@ function render(){
         ctx.stroke(); ctx.restore();
         /* the hanks on the stay */
         ctx.fillStyle = "rgba(40,34,28,0.9)";
-        for(let i=0;i<=6;i++){ const h = along(TACK, HEAD, i/6, 0, 0), p = pt(h); if(p[2] > NEAR){ ctx.beginPath(); ctx.arc(hw+F*p[0]/p[2], hh-F*p[1]/p[2], Math.max(0.8, F*0.22/p[2]), 0, Math.PI*2); ctx.fill(); } }
+        for(let i=0;i<=8;i++){ const h = along(TACK, HEAD, i/8, 0, 0), p = pt(h); if(p[2] > NEAR){ ctx.beginPath(); ctx.arc(hw+F*p[0]/p[2], hh-F*p[1]/p[2], Math.max(0.8, F*0.22/p[2]), 0, Math.PI*2); ctx.fill(); } }
       }
       /* the sheet: clew to the deck aft, and the luff drawn over the sail as the stay it hangs from */
-      ctx.strokeStyle = rgb(INK, 0.4); ctx.lineWidth = 1; ctx.beginPath(); segCam(pt(CLEW), pt([lee*11,4.2,-26]), hw, hh); ctx.stroke();
+      ctx.strokeStyle = rgb(INK, 0.4); ctx.lineWidth = 1; ctx.beginPath(); segCam(pt(CLEW), pt([lee*10.5,4.3,-42]), hw, hh); ctx.stroke();
+      ctx.globalAlpha = 1;
     }
     /* SEA-H DETAIL: two of your own hands walked the deck ahead in the third cut — Ripley, 21:53: "annoying". Gone; the other ships keep theirs. */
     /* your broadside: the flash from the rail on that side, and the smoke */
@@ -7695,6 +7726,7 @@ const map=[["sDead","vDead","dead",0],["sDefl","vDefl","defl",0],["sExp","vExp",
            ["sHw","vHw","hullWarn",0],["sHc","vHc","hullCrit",0], /* 104a, loop 122, ruling 60 */
            ["sRt","vRt","slotRollTol",0],["sHt","vHt","slotHeadingTol",0],["sSl","vSl","slotSpeedPct",0], /* 107a, DOCKING §3.3, ruling 65 */
            ["sTr","vTr","transitionSec",1],                     /* 108a, loop 126, ruling 67 */
+           ["sJf","vJf","sailFade",1],                          /* sea-j v2.0, OL-18 */
            ["sGrace","vGrace","grace",0],                         /* 092b */
            ["sMove","vMove","tapMove",0]];                        /* 092c */
 
@@ -8157,6 +8189,7 @@ function writeReport(){
        and the session's changes are printed beside it. */
     "equipment     "+equipLine()+"\n"+
     "shipwright    "+swReportLine()+"  [ASSUMED] sea-g\n"+
+    "sail fade     "+sailFadeLine()+"\n"+                                                      /* sea-j v2.0, OL-18 */
     "lookout       "+lookoutLine()+"  [ASSUMED] sea-h\n"+
     "laser         "+laserLine()+"\n"+
     "fired         "+fireLine()+"\n"+
