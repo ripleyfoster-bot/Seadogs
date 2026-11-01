@@ -1571,7 +1571,7 @@
    THIS IS THE ONLY PLACE THE ID IS WRITTEN: the <title> and the TUNE report header
    both read it. Bump this line and nothing else. The delivered file carries it as a
    suffix (index_sea-j_v1.1.html); the repo holds index.html. */
-const BUILD = "sea-j · v1.1";
+const BUILD = "sea-j · v1.2";
 document.title = "SEA DOGS "+BUILD+" — pirate reskin of ELITE: THE CLONES 110c";
 
 /* ------------------------------------------------------------------
@@ -7308,33 +7308,62 @@ function render(){
     for(const sd of [-1,1]) for(let g=0; g<4; g++){ const z = -44+g*13, x = sd*(11-Math.max(0,z+12)*0.12); segCam(pt([x*0.8,4.6,z]), pt([x*1.25,4.4,z]), hw, hh); }
     ctx.stroke(); ctx.lineWidth = 1;
     ctx.strokeStyle = rgb(INK, 0.25); ctx.beginPath();
-    segCam(pt([0,5,13]), pt([0,10,36]), hw, hh);
     segCam(pt([0,4,-6]), pt([0,40,-6]), hw, hh);
     segCam(pt([-10,27,-6]), pt([10,27,-6]), hw, hh);
     ctx.stroke();
-    /* SEA-J, OL-16 — THE JIB ([DECISION], Ripley, 1 Nov 2026: "yes, a foresail,
-       low and to one side: a jib off the bowsprit, kept out of the centre of
-       the view"). A fore-and-aft triangle: tack on the bowsprit, head low on
-       the forestay, clew sheeted aft to the LEE rail — the side the wind
-       blows toward, read from the wind in the ship's frame (the other ships'
-       square sails use the same read, along the keel; a jib bellies across
-       it). The luff is a line on the centreline; the body of the sail is all
-       to one side. The side holds through a dead zone so it does not flap
-       about with the wind near dead ahead or astern; it crosses when the
-       ship does. Every figure [ASSUMED], this build's. Presentation only —
-       nothing written, nothing saved. */
-    { const wl = qrot(qconj(q), wind.dir);
+    /* SEA-J, OL-16 — THE BOWSPRIT AND THE JIB. v1.1 ([DECISION], Ripley, 1 Nov
+       2026: "a jib off the bowsprit, low and to one side") drew a small
+       triangle; flown at 10:07 — "too small to look right and it isn't clear
+       what it is; a more realistic construction, with both timber and sail
+       cloth components; the size can be made to look right as we will
+       implement the fade" (OL-18). v1.2 is that: the bowsprit as a tapered
+       SPAR, not a line, with its forestay to the masthead and its bobstay to
+       the stem; the jib hanked to the stay from the sprit's end to three-
+       quarters up it, clew sheeted aft to the LEE rail, a radial cut (seams
+       fanning from the head), a bolt-rope, the belly's shadow, and a sheet
+       to the deck. Lee is the side the wind blows toward, read from the wind
+       in the ship's frame (the other ships' square sails use the same read
+       along the keel; a jib bellies across it); the side holds through a
+       dead zone so it does not flap with the wind near dead ahead or astern,
+       and crosses when the ship does. Every figure [ASSUMED], this build's.
+       Presentation only — nothing written, nothing saved. */
+    { const TIP = [0,11.5,42], HEEL = [0,5,12];
+      /* the spar: a tapered quad, deck timber, a dark edge */
+      const spar = [pt([-1.1,HEEL[1],HEEL[2]]), pt([1.1,HEEL[1],HEEL[2]]), pt([0.45,TIP[1],TIP[2]]), pt([-0.45,TIP[1],TIP[2]])];
+      if(pathCam(spar, hw, hh)){ ctx.fillStyle = rgb(shade(DECK_RGB, 0.9)); ctx.fill(); ctx.strokeStyle = "rgba(25,22,20,0.8)"; ctx.lineWidth = 1; ctx.stroke(); }
+      /* standing rigging: forestay to the masthead, bobstay to the stem */
+      ctx.strokeStyle = rgb(INK, 0.35); ctx.lineWidth = 1; ctx.beginPath();
+      segCam(pt(TIP), pt([0,40,-6]), hw, hh); segCam(pt(TIP), pt([0,0.5,16]), hw, hh); ctx.stroke();
+      /* the sail */
+      const wl = qrot(qconj(q), wind.dir);
       if(Math.abs(wl[0]) > 0.12) jibSide = wl[0] > 0 ? 1 : -1;
       const lee = jibSide, belly = 0.35 + 0.65*Math.min(1, Math.abs(wl[0]));
-      /* tack · head · leech belly · clew · foot belly — the leech bows out to leeward, the foot sags */
-      const jib = [pt([0,9.5,33]), pt([0,19,17]), pt([lee*(7+6*belly),12.5,11]), pt([lee*9,7.2,-3]), pt([lee*(6+4*belly),7.5,14])];
-      if(pathCam(jib, hw, hh)){ ctx.fillStyle = rgb(SAIL_RGB, 0.92); ctx.fill();
-        ctx.strokeStyle = rgb(shade(SAIL_RGB, 0.72), 0.6); ctx.lineWidth = 1; ctx.stroke(); }
-      /* the belly's shadow: the aft half, a touch darker, as the square sails have */
-      const sh = [pt([0,19,17]), pt([lee*(7+6*belly),12.5,11]), pt([lee*9,7.2,-3]), pt([lee*4,7.4,8]), pt([0,14.2,25])];
-      if(pathCam(sh, hw, hh)){ ctx.fillStyle = rgb(shade(SAIL_RGB, 0.82), 0.45); ctx.fill(); }
-      /* the sheet: clew to the deck */
-      ctx.strokeStyle = rgb(INK, 0.3); ctx.beginPath(); segCam(pt([lee*9,7.2,-3]), pt([lee*10,6.4,-14]), hw, hh); ctx.stroke();
+      const TACK = [0,11,39], HEAD = [0,32.5,6], CLEW = [lee*10.5,6.8,-10], B = lee*(5+9*belly);
+      const along = function(a,b,t,bx,by){ const s = Math.sin(Math.PI*t); return [a[0]+(b[0]-a[0])*t + bx*s, a[1]+(b[1]-a[1])*t + by*s, a[2]+(b[2]-a[2])*t]; };
+      const N = 6, leech = [], foot = [];
+      for(let i=1;i<N;i++) leech.push(along(HEAD, CLEW, i/N, B, 0));
+      for(let i=1;i<N;i++) foot.push(along(CLEW, TACK, i/N, B*0.45, -1.6));
+      const poly = [TACK, HEAD].concat(leech, [CLEW], foot).map(pt);
+      if(pathCam(poly, hw, hh)){ ctx.fillStyle = rgb(SAIL_RGB, 0.94); ctx.fill();
+        /* the bolt-rope */
+        ctx.strokeStyle = rgb(shade(SAIL_RGB, 0.6), 0.8); ctx.lineWidth = 1.5; ctx.stroke(); ctx.lineWidth = 1;
+        /* everything on the cloth is clipped to the cloth — the seams' curves otherwise stray past the leech near the head */
+        ctx.save(); ctx.clip();
+        /* the belly's shadow: the aft half, from the leech in to a line down the sail's middle */
+        const mid = []; for(let i=1;i<N;i++){ const l = leech[i-1], u = along(HEAD, TACK, i/N, 0, 0); mid.push([ (l[0]+u[0])*0.55, (l[1]+u[1])/2, (l[2]+u[2])/2 ]); }
+        const sh = [HEAD].concat(leech, [CLEW], mid.slice().reverse()).map(pt);
+        if(pathCam(sh, hw, hh)){ ctx.fillStyle = rgb(shade(SAIL_RGB, 0.8), 0.5); ctx.fill(); }
+        /* the cloths: a radial cut, seams fanning from the head to the leech and the foot */
+        ctx.strokeStyle = rgb(shade(SAIL_RGB, 0.7), 0.55); ctx.lineWidth = 1; ctx.beginPath();
+        for(let i=1;i<N;i++){ const e = leech[i-1], m = along(HEAD, e, 0.5, B*0.5, 0); segCam(pt(HEAD), pt(m), hw, hh); segCam(pt(m), pt(e), hw, hh); }
+        for(let i=1;i<N-1;i++){ const e = foot[i-1], m = along(HEAD, e, 0.5, B*0.3, 0); segCam(pt(HEAD), pt(m), hw, hh); segCam(pt(m), pt(e), hw, hh); }
+        ctx.stroke(); ctx.restore();
+        /* the hanks on the stay */
+        ctx.fillStyle = "rgba(40,34,28,0.9)";
+        for(let i=0;i<=6;i++){ const h = along(TACK, HEAD, i/6, 0, 0), p = pt(h); if(p[2] > NEAR){ ctx.beginPath(); ctx.arc(hw+F*p[0]/p[2], hh-F*p[1]/p[2], Math.max(0.8, F*0.22/p[2]), 0, Math.PI*2); ctx.fill(); } }
+      }
+      /* the sheet: clew to the deck aft, and the luff drawn over the sail as the stay it hangs from */
+      ctx.strokeStyle = rgb(INK, 0.4); ctx.lineWidth = 1; ctx.beginPath(); segCam(pt(CLEW), pt([lee*11,4.2,-26]), hw, hh); ctx.stroke();
     }
     /* SEA-H DETAIL: two of your own hands walked the deck ahead in the third cut — Ripley, 21:53: "annoying". Gone; the other ships keep theirs. */
     /* your broadside: the flash from the rail on that side, and the smoke */
