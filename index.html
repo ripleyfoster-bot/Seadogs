@@ -462,6 +462,13 @@
   .mmax:disabled{border-color:var(--ink-faint);color:var(--ink-faint);}
   .mfig{font-size:10px;line-height:1.5;color:var(--ink-dim);
         padding:6px 0 8px;font-variant-numeric:tabular-nums;}
+  /* OL-13, sea-j v4.0. A Shipwright figure line is a STACK of short
+     .mfig lines, one fact a line, each short enough for a 402px
+     phone — PANEL §3.6 calls a wrapped line a fault, and 155 chars
+     will not shrink into 60. Stacked lines share one block of
+     padding so the stack reads as one figure. */
+  .mfig + .mfig{padding-top:0;}
+  .mfig.mfs{padding-bottom:0;}
   .mconf{
     width:100%;min-height:44px;background:transparent;
     border:1px solid var(--ink-dim);border-radius:2px;color:var(--ink);
@@ -1604,7 +1611,7 @@
    THIS IS THE ONLY PLACE THE ID IS WRITTEN: the <title> and the TUNE report header
    both read it. Bump this line and nothing else. The delivered file carries it as a
    suffix (index_sea-j_v1.1.html); the repo holds index.html. */
-const BUILD = "sea-j · v3.1";
+const BUILD = "sea-j · v4.0";
 document.title = "SEA DOGS "+BUILD+" — pirate reskin of ELITE: THE CLONES 110c";
 
 /* ------------------------------------------------------------------
@@ -10641,6 +10648,15 @@ function swWhy(reasons){
   if(reasons.indexOf("aboard")  !== -1) w.push('the ship you are in');
   return w.length ? ' \u00b7 '+w.join(' \u00b7 ') : '';
 }
+/* OL-13, sea-j v4.0. The reasons as a line of their own (no leading
+   separator), and a stack of .mfig lines from a list — empty strings
+   are dropped, every line but the last is .mfs so the stack carries
+   one block of padding. */
+function swWhyLine(reasons){ return swWhy(reasons).replace(/^ \u00b7 /, ''); }
+function swFigs(lines){
+  const L = lines.filter(function(x){ return x; });
+  return L.map(function(x, i){ return '<div class="mfig'+(i < L.length-1 ? ' mfs' : '')+'">'+x+'</div>'; }).join('');
+}
 function swRows(){
   let h = '';
   const tl = swTech();
@@ -10665,16 +10681,20 @@ function swRows(){
 function swBatteryExpansion(b, q){
   const L = LASERS[b.key];
   let h = '<div class="mexp">';
-  h += '<div class="mfig">'+L.balls+' guns a side \u00b7 '+L.damage+' a ball \u00b7 reload '+(1/L.rate).toFixed(1)+' s \u00b7 '+
-       L.energy+' powder \u00b7 lays to '+L.range+' u</div>';
+  /* OL-13: one fact a line — see .mfig.mfs */
+  h += swFigs([L.balls+' guns a side \u00b7 '+L.damage+' a ball \u00b7 reload '+(1/L.rate).toFixed(1)+' s',
+               L.energy+' powder \u00b7 lays to '+L.range+' u']);
   if(q.fitted){
     const sq = swQuoteSell(b.price);
-    h += '<div class="mgrp"><div class="mfig">SELL \u00b7 credits '+cr(sq.credit)+' CR (list '+cr(b.price)+' less '+swFeePct()+'% fee) \u00b7 leaves the mount empty</div>'+
+    h += '<div class="mgrp">'+swFigs(['SELL \u00b7 credits '+cr(sq.credit)+' CR',
+                                     'list '+cr(b.price)+' CR less '+swFeePct()+'% fee',
+                                     'leaves the mount empty'])+
          '<button class="mconf" data-act="swsell">CONFIRM SALE</button></div>';
   } else {
-    h += '<div class="mgrp"><div class="mfig">BUY \u00b7 cost '+cr(q.cost)+' CR'+
-         (q.credit ? ' less '+cr(q.credit)+' CR for the '+swFittedBattery().name+' coming off' : '')+
-         ' \u00b7 net '+cr(q.net)+' CR \u00b7 you have '+cr(state.commander.credits)+' CR'+swWhy(q.reasons)+'</div>'+
+    h += '<div class="mgrp">'+swFigs(['BUY \u00b7 cost '+cr(q.cost)+' CR',
+                                     q.credit ? 'less '+cr(q.credit)+' CR for the '+swFittedBattery().name+' coming off' : '',
+                                     'net '+cr(q.net)+' CR \u00b7 you have '+cr(state.commander.credits)+' CR',
+                                     swWhyLine(q.reasons)])+
          '<button class="mconf" data-act="swbuy" '+(q.reasons.length?'disabled':'')+'>CONFIRM PURCHASE</button></div>';
   }
   return h + '</div>';
@@ -10684,13 +10704,15 @@ function swModuleExpansion(m, q){
   const what = m.id === "escapePod"
     ? 'Hull 0 takes to the boats instead of losing the captain \u00b7 used up on the day'
     : 'Makes port for you from '+DC_RANGE+' u \u00b7 the DOCK button';
-  h += '<div class="mfig">'+what+'</div>';
+  h += swFigs(what.split(' \u00b7 '));                        /* OL-13: one fact a line */
   if(q.fitted){
     const sq = swQuoteSell(m.price);
-    h += '<div class="mgrp"><div class="mfig">SELL \u00b7 credits '+cr(sq.credit)+' CR (list '+cr(m.price)+' less '+swFeePct()+'% fee)</div>'+
+    h += '<div class="mgrp">'+swFigs(['SELL \u00b7 credits '+cr(sq.credit)+' CR',
+                                     'list '+cr(m.price)+' CR less '+swFeePct()+'% fee'])+
          '<button class="mconf" data-act="swsell">CONFIRM SALE</button></div>';
   } else {
-    h += '<div class="mgrp"><div class="mfig">BUY \u00b7 cost '+cr(q.cost)+' CR \u00b7 you have '+cr(state.commander.credits)+' CR'+swWhy(q.reasons)+'</div>'+
+    h += '<div class="mgrp">'+swFigs(['BUY \u00b7 cost '+cr(q.cost)+' CR \u00b7 you have '+cr(state.commander.credits)+' CR',
+                                     swWhyLine(q.reasons)])+
          '<button class="mconf" data-act="swbuy" '+(q.reasons.length?'disabled':'')+'>CONFIRM PURCHASE</button></div>';
   }
   return h + '</div>';
@@ -10698,14 +10720,16 @@ function swModuleExpansion(m, q){
 function swHullExpansion(cls, q){
   const r = SHIPS[cls];
   let h = '<div class="mexp">';
-  h += '<div class="mfig">Speed '+r.maxSpeed+' \u00b7 helm '+r.rollRate+'\u00b0/s \u00b7 hull '+r.hullMax+' \u00b7 hold '+r.holdTonnes+' t'+
-       (q.aboard ? ' \u00b7 the ship you are in' : '')+'</div>';
+  h += swFigs(['Speed '+r.maxSpeed+' \u00b7 helm '+r.rollRate+'\u00b0/s \u00b7 hull '+r.hullMax+' \u00b7 hold '+r.holdTonnes+' t',
+               q.aboard ? 'the ship you are in' : '']);              /* OL-13: one fact a line */
   if(!q.aboard){
-    h += '<div class="mgrp"><div class="mfig">TRADE \u00b7 cost '+cr(q.cost)+' CR \u00b7 your '+SHIP_NAME[state.ship.class]+' in part exchange '+cr(q.tradeIn)+' CR'+
-         (q.repair ? ' (less '+cr(q.repair)+' CR of repair)' : '')+
-         ' \u00b7 moving your fittings '+cr(q.transfer)+' CR ('+swFeePct()+'%)'+
-         ' \u00b7 net '+cr(q.net)+' CR \u00b7 you have '+cr(state.commander.credits)+' CR'+swWhy(q.reasons)+'</div>'+
-         '<div class="mfig">Cargo and fittings come across \u00b7 the new hull is whole</div>'+
+    h += '<div class="mgrp">'+swFigs(['TRADE \u00b7 cost '+cr(q.cost)+' CR',
+                                     'your '+SHIP_NAME[state.ship.class]+' in part exchange '+cr(q.tradeIn)+' CR',
+                                     q.repair ? 'less '+cr(q.repair)+' CR of repair' : '',
+                                     'moving your fittings '+cr(q.transfer)+' CR ('+swFeePct()+'%)',
+                                     'net '+cr(q.net)+' CR \u00b7 you have '+cr(state.commander.credits)+' CR',
+                                     swWhyLine(q.reasons),
+                                     'cargo and fittings come across', 'the new hull is whole'])+
          '<button class="mconf" data-act="swbuy" '+(q.reasons.length?'disabled':'')+'>CONFIRM TRADE</button></div>';
   }
   return h + '</div>';
@@ -10714,9 +10738,15 @@ function swHullExpansion(cls, q){
 function measureMfig(){
   const grps = mktBody.querySelectorAll('.mexp .mgrp');
   if(!grps.length) return;                  /* no row open: keep the last reading */
-  const el = grps[grps.length-1].querySelector('.mfig');
+  /* OL-13, sea-j v4.0: a Shipwright group is a stack of lines —
+     measure the TALLEST, so one wrapped line in a stack still
+     prints WRAPPED. A one-line group measures as it always did. */
+  let el = null, hpx = 0;
+  grps[grps.length-1].querySelectorAll('.mfig').forEach(function(e){
+    const h = e.getBoundingClientRect().height;
+    if(h > hpx){ hpx = h; el = e; }
+  });
   if(!el) return;
-  const hpx = el.getBoundingClientRect().height;
   if(hpx <= 0) return;                      /* rendered while the panel was closed */
   const cs = getComputedStyle(el);
   mfigChars = el.textContent.length;
