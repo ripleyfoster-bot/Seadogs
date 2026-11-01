@@ -135,10 +135,24 @@
   }
   .fire{
     flex:1 1 auto;position:relative;
-    display:flex;align-items:center;justify-content:center;
     color:var(--ink-faint);font-size:9px;letter-spacing:.16em;text-align:center;
-    touch-action:none;
+    touch-action:none;overflow:hidden;
   }
+  /* SEA-K v1.0, OL-24 — THE GUN DECK. The zone carries two layers: `.fireArt`,
+     an SVG of the cannons and the zone lines, and `.fireTxt`, the words
+     paintFire() has always written (now into the text layer, never the
+     zone). Both are children, so SEA-C's rule below keeps every touch on the
+     zone itself. layoutFireArt() sets the text layer's top/bottom to the
+     broadsides' region, so the words sit under the two cannons and clear
+     the chaser bands. */
+  .fireArt{position:absolute;left:0;top:0;width:100%;height:100%;display:block;}
+  .fireArt .gun{fill:var(--ink-faint);}
+  .fireArt .gun.lit{fill:var(--ink);}
+  .fireArt .zl{stroke:var(--ink-faint);stroke-width:1;stroke-dasharray:3 3;fill:none;}
+  .fireArt .gl{fill:var(--ink-faint);font-size:8px;letter-spacing:.14em;font-family:inherit;}
+  .fireArt .gl.lit{fill:var(--ink);}
+  .fireTxt{position:absolute;left:0;right:0;top:0;bottom:0;
+    display:flex;align-items:center;justify-content:center;padding:0 4px;}
   /* 092a, COMBAT step 3. The zone is the button (CONTROL §4.2) — no
      graphic. `hot` is the trigger held with a laser that can fire;
      `dry` is no laser, or no energy. Colours [ASSUMED]. */
@@ -1044,7 +1058,7 @@
       <div class="stem" id="stem"></div>
       <div class="dot" id="dot"></div>
     </div>
-    <div class="fire" id="fire">PORT &middot; STARBOARD</div>
+    <div class="fire" id="fire"><svg class="fireArt" id="fireArt" aria-hidden="true"></svg><div class="fireTxt" id="fireTxt">PORT &middot; STARBOARD</div></div>
     <div class="throttle" id="thr">
       <div class="fill" id="thrFill"></div>
       <div class="knob" id="thrKnob"></div>
@@ -1330,7 +1344,9 @@
   <div class="toggles">
     <button id="tRefill">SHIPS' SHIELDS REFILL</button>
     <button id="bPadFire">PAD FIRE</button>
+    <button id="bGunDeck">GUN DECK</button>
   </div>
+  <div class="note" style="font-size:9px;color:#3d3120;margin-top:-8px">GUN DECK — sea-k v1.0, OL-24: which chasers the fire zone draws. A <b>preview</b>: no chaser exists yet (OL-6), so a bow or stern band lights its cannon and fires nothing. NONE is the game.</div>
   <div class="note" style="font-size:9px;color:#3d3120;margin-top:-8px">
     SHIPS' SHIELDS REFILL lit = every other ship's shields refill at +4 a second, as yours do —
     092a's behaviour, under which a pack of five could not be beaten on 4 October (1,160 points
@@ -1611,7 +1627,7 @@
    THIS IS THE ONLY PLACE THE ID IS WRITTEN: the <title> and the TUNE report header
    both read it. Bump this line and nothing else. The delivered file carries it as a
    suffix (index_sea-j_v1.1.html); the repo holds index.html. */
-const BUILD = "sea-j · v4.0";
+const BUILD = "sea-k · v1.0";
 document.title = "SEA DOGS "+BUILD+" — pirate reskin of ELITE: THE CLONES 110c";
 
 /* ------------------------------------------------------------------
@@ -1718,6 +1734,11 @@ const SPEC = { dead:6, defl:55, exp:1.6,
                                             NEW KEY: a stored tuning from 107a has none and reads this. */
                bsRange:230, bsSlot:90, breakRange:90, breakSec:3, bendReach:140, scatterDeg:3.5,   /* SEA-F: the fight's six figures, all [ASSUMED], on TUNE sliders */
                padFire:"double",         /* 092b, loop 65 (B) and the gesture decision (C): off | single | double */
+               gunDeck:"none",           /* SEA-K v1.0, OL-24: WHICH CHASERS THE GUN DECK DRAWS — none | bow | stern | both.
+                                            A PREVIEW. No chaser exists yet (OL-6); this key stands in for the fitted
+                                            guns so the four layouts can be seen on the device. When OL-6 lands, the
+                                            layout reads the equipment and this key goes. NEW KEY: a stored tuning
+                                            from sea-j has none and reads this. gunDeck() validates. */
                /* 092c. `tapGap` (092b, 200) IS RETIRED AND RENAMED, ON PURPOSE. A stored
                   tuning outranks a changed constant (S52's shape), and 092b stored 200 on
                   the device — so a new default under the old key would never be read.
@@ -4502,23 +4523,52 @@ window.addEventListener("mouseup",function(){ if(thrId==="m") thrId=null; });
    bears. The page going hidden releases everything, as before. */
 const fireEl = document.getElementById("fire");
 let trigger = false, triggerTap = false, fireTouch = null, fireSide = 0, tapSide = 0;   /* SEA-B: `tapSide` keeps a tap's half for the frame the latch fires in */
+let fireChaser = null;                                  /* SEA-K v1.0, OL-24: "bow" | "stern" while a chaser band is held; runtime, never saved */
+/* SEA-K v1.0, OL-24 — THE GUN DECK'S ZONES. The zone is ~184 wide by 200 tall
+   on the iPhone (controls bar 200, wheel pad 46%, throttle 32), so the
+   chasers come off the TOP and BOTTOM as bands of GUN_BAND px, and the
+   broadsides keep the halves between them: a y-test first, then the x-test
+   the halves have always had. Every zone clears a 44 px thumb at any
+   layout (halves 92 wide; the broadsides' region 88 tall with both bands).
+   Thirds across the width were drawn and ruled out — bow and stern came to
+   31 px each. Ruled by Ripley on the mock-up, 1 Nov 2026. */
+const GUN_BAND = 56;                                     /* px, the chaser band's height — a thumb and a little, [ASSUMED] */
+function gunDeck(){ const v = T.gunDeck; return (v === "bow" || v === "stern" || v === "both") ? v : "none"; }
+function gunDeckHas(which){ const g = gunDeck(); return g === which || g === "both"; }
 function sideFromX(x){
   const r = fireEl.getBoundingClientRect();
   return x < r.left + r.width/2 ? -1 : 1;
+}
+function zoneFromXY(x, y){
+  const r = fireEl.getBoundingClientRect();
+  if(gunDeckHas("bow")   && y <  r.top + GUN_BAND)    return "bow";
+  if(gunDeckHas("stern") && y >= r.bottom - GUN_BAND) return "stern";
+  return sideFromX(x);
+}
+/* A touch in a chaser band OWNS the zone (the halves cannot fire under it)
+   and lights its cannon, BUT FIRES NOTHING: there is no chaser to fire until
+   OL-6. OL-6's hook is here — set the trigger and give playerFire() the gun.
+   The bow band turns the head to the bow (lookGuns(0)); the stern band
+   leaves the head where it is, since there is no aft view (OL-5). */
+function fireDown(x, y, id){
+  const z = zoneFromXY(x, y);
+  fireTouch = id;
+  if(z === "bow" || z === "stern"){ fireChaser = z; fireSide = 0; tapSide = 0; if(z === "bow") lookGuns(0); return; }
+  fireChaser = null; fireSide = z; tapSide = z;
+  lookGuns(fireSide);                                   /* SEA-E: the guns turn the head; silence turns it back */
+  trigger = true; triggerTap = true;
 }
 fireEl.addEventListener("touchstart",function(e){
   e.preventDefault();
   if(fireTouch !== null) return;
   const t = e.changedTouches[0];
-  fireTouch = t.identifier; fireSide = sideFromX(t.clientX); tapSide = fireSide;
-  lookGuns(fireSide);                                   /* SEA-E: the guns turn the head; silence turns it back */
-  trigger = true; triggerTap = true; wake();
+  fireDown(t.clientX, t.clientY, t.identifier); wake();
 },{passive:false});
 fireEl.addEventListener("touchmove",function(e){ e.preventDefault(); },{passive:false});
 function fireEnd(e){
   e.preventDefault();
   for(const t of e.changedTouches){
-    if(t.identifier === fireTouch){ fireTouch = null; trigger = false; fireSide = 0; }
+    if(t.identifier === fireTouch){ fireTouch = null; trigger = false; fireSide = 0; fireChaser = null; }
   }
 }
 fireEl.addEventListener("touchend",fireEnd,{passive:false});
@@ -4536,20 +4586,20 @@ fireEl.addEventListener("touchcancel",fireEnd,{passive:false});
 function fireAudit(e){
   if(fireTouch === null || fireTouch === "m") return;
   for(const t of e.touches) if(t.identifier === fireTouch) return;
-  fireTouch = null; trigger = false; fireSide = 0;
+  fireTouch = null; trigger = false; fireSide = 0; fireChaser = null;
 }
 document.addEventListener("touchend", fireAudit, { capture:true, passive:true });
 document.addEventListener("touchcancel", fireAudit, { capture:true, passive:true });
 fireEl.addEventListener("mousedown",function(e){
   if(fireTouch !== null) return;
-  fireTouch = "m"; fireSide = sideFromX(e.clientX); tapSide = fireSide; lookGuns(fireSide); trigger = true; triggerTap = true;
+  fireDown(e.clientX, e.clientY, "m");
 });
 window.addEventListener("mouseup",function(){
-  if(fireTouch === "m"){ fireTouch = null; trigger = false; fireSide = 0; }
+  if(fireTouch === "m"){ fireTouch = null; trigger = false; fireSide = 0; fireChaser = null; }
 });
 document.addEventListener("visibilitychange",function(){
   if(document.visibilityState === "hidden"){
-    fireTouch = null; trigger = false; triggerTap = false; fireSide = 0;
+    fireTouch = null; trigger = false; triggerTap = false; fireSide = 0; fireChaser = null;
     if(padId === null && padHold){ padHold = false; pitchIn = 0; rollIn = 0; defPx = 0; }
   }
 });
@@ -6549,7 +6599,94 @@ function arcWord(L, side){
     return '<span style="color:rgb('+ROLE_RGB[c.role]+')">'+(c === picked ? "◎ " : "")+
            (c.hostile && c.role === "police" ? "NAVY (TURNED)" : ROLE_WORD[c.role])+" "+e.d.toFixed(0)+"</span>"; }).join(" ");
 }
+/* SEA-K v1.0, OL-24 — THE GUN DECK'S ART. One cannon symbol, used four
+   times (port, starboard, bow, stern), the zone's dashed lines, and the
+   chasers' words. Built once; layoutFireArt() places everything from the
+   zone's measured size and the gunDeck() layout, and runs again whenever
+   either changes (paintFire checks each frame — a compare, no work). The
+   lit cannon is the one being held, or the side that fired. Glyphs are
+   children of the zone, pointer-events:none, and are NEVER replaced on
+   fire — SEA-C's rule, kept. */
+const fireArt = document.getElementById("fireArt"), fireTxt = document.getElementById("fireTxt");
+const SVGNS = "http://www.w3.org/2000/svg";
+let artW = 0, artH = 0, artDeck = "";
+const art = {};
+function svgEl(tag, attrs, parent){
+  const el = document.createElementNS(SVGNS, tag);
+  for(const k in attrs) el.setAttribute(k, attrs[k]);
+  (parent || fireArt).appendChild(el); return el;
+}
+function buildFireArt(){
+  const defs = svgEl("defs", {});
+  const sym = svgEl("g", { id:"gunSym" }, defs);                       /* barrel along +x, muzzle at x=30, on a carriage */
+  svgEl("rect",   { x:-14, y:-4,   width:46, height:8,  rx:2 },   sym);
+  svgEl("rect",   { x:-18, y:-6.5, width:8,  height:13, rx:2 },   sym);
+  svgEl("circle", { cx:-20, cy:0, r:3 },                           sym);
+  svgEl("rect",   { x:24,  y:-5.5, width:6,  height:11, rx:1.5 }, sym);
+  svgEl("rect",   { x:-12, y:6,    width:22, height:4,  rx:1 },   sym);
+  svgEl("circle", { cx:-8, cy:12, r:3 },                           sym);
+  svgEl("circle", { cx:6,  cy:12, r:3 },                           sym);
+  art.lineTop   = svgEl("line", { "class":"zl" });
+  art.lineBot   = svgEl("line", { "class":"zl" });
+  art.lineMid   = svgEl("line", { "class":"zl" });
+  art.port  = svgEl("use", { "class":"gun", href:"#gunSym" });
+  art.stbd  = svgEl("use", { "class":"gun", href:"#gunSym" });
+  art.bow   = svgEl("use", { "class":"gun", href:"#gunSym" });
+  art.stern = svgEl("use", { "class":"gun", href:"#gunSym" });
+  art.bowL   = svgEl("text", { "class":"gl", "text-anchor":"start" }); art.bowL.textContent = "BOW";
+  art.sternL = svgEl("text", { "class":"gl", "text-anchor":"start" }); art.sternL.textContent = "STERN";
+}
+function layoutFireArt(){
+  const w = fireEl.clientWidth, h = fireEl.clientHeight, deck = gunDeck();
+  if(w === artW && h === artH && deck === artDeck) return;
+  if(!art.port) buildFireArt();
+  artW = w; artH = h; artDeck = deck;
+  if(!w || !h) return;
+  fireArt.setAttribute("viewBox", "0 0 "+w+" "+h);
+  const bow = deck === "bow" || deck === "both", stern = deck === "stern" || deck === "both";
+  const y0 = bow ? GUN_BAND : 0, y1 = stern ? h - GUN_BAND : h, rh = y1 - y0;
+  const s = Math.max(0.55, Math.min(0.8, rh / 110)), cy = y0 + rh * 0.4;
+  art.port.setAttribute("transform", "translate("+(w*0.27).toFixed(1)+" "+cy.toFixed(1)+") scale(-1 1) scale("+s.toFixed(2)+")");
+  art.stbd.setAttribute("transform", "translate("+(w*0.73).toFixed(1)+" "+cy.toFixed(1)+") scale("+s.toFixed(2)+")");
+  art.lineMid.setAttribute("x1", w/2); art.lineMid.setAttribute("x2", w/2);
+  art.lineMid.setAttribute("y1", y0);  art.lineMid.setAttribute("y2", (y0 + rh * 0.56).toFixed(0));   /* stops where the words start */
+  const show = function(el, on){ el.setAttribute("visibility", on ? "visible" : "hidden"); };
+  show(art.bow, bow); show(art.bowL, bow); show(art.lineTop, bow);
+  show(art.stern, stern); show(art.sternL, stern); show(art.lineBot, stern);
+  if(bow){
+    art.bow.setAttribute("transform", "translate("+(w/2).toFixed(1)+" "+(GUN_BAND*0.6).toFixed(1)+") rotate(-90) scale(0.7)");
+    art.bowL.setAttribute("x", w/2 + 42); art.bowL.setAttribute("y", GUN_BAND*0.57);
+    art.lineTop.setAttribute("x1", 0); art.lineTop.setAttribute("x2", w);
+    art.lineTop.setAttribute("y1", GUN_BAND); art.lineTop.setAttribute("y2", GUN_BAND);
+  }
+  if(stern){
+    art.stern.setAttribute("transform", "translate("+(w/2).toFixed(1)+" "+(h - GUN_BAND*0.7).toFixed(1)+") rotate(90) scale(0.7)");
+    art.sternL.setAttribute("x", w/2 + 42); art.sternL.setAttribute("y", h - GUN_BAND*0.42);
+    art.lineBot.setAttribute("x1", 0); art.lineBot.setAttribute("x2", w);
+    art.lineBot.setAttribute("y1", h - GUN_BAND); art.lineBot.setAttribute("y2", h - GUN_BAND);
+  }
+  /* the words: the lower part of the broadsides' region, under the two cannons */
+  fireTxt.style.top = (y0 + rh * 0.56).toFixed(0)+"px";
+  fireTxt.style.bottom = (h - y1).toFixed(0)+"px";
+}
+function litGuns(){
+  /* a held half lights ITS cannon only; `pSide` (the last shot's side) lights one
+     only when nothing is held — the keyboard's Space/Q/E — else a reload window
+     would light the other rail's gun from the previous broadside */
+  const held = fireTouch !== null && fireChaser === null;
+  const firing = !held && fireTouch === null && fireNow === "firing";
+  art.port.classList.toggle("lit",  (held && fireSide < 0) || (firing && pSide < 0));
+  art.stbd.classList.toggle("lit",  (held && fireSide > 0) || (firing && pSide > 0));
+  art.bow.classList.toggle("lit",   fireChaser === "bow");   art.bowL.classList.toggle("lit",   fireChaser === "bow");
+  art.stern.classList.toggle("lit", fireChaser === "stern"); art.sternL.classList.toggle("lit", fireChaser === "stern");
+}
+function gunDeckLine(){
+  const g = gunDeck();
+  return "preview "+g+"  ·  band "+GUN_BAND+" px  ·  zone "+artW+"x"+artH+" px  ·  broadsides' region "+(artH - (gunDeckHas("bow") ? GUN_BAND : 0) - (gunDeckHas("stern") ? GUN_BAND : 0))+" tall"+
+         (fireChaser ? "  ·  "+fireChaser+" band held (fires nothing until OL-6)" : "")+"  [ASSUMED] sea-k v1.0";
+}
 function paintFire(){
+  layoutFireArt(); litGuns();
   const k = foreLaser();
   let t, cls = "";
   if(!k){ t = "NO GUNS"; cls = "dry"; }
@@ -6557,10 +6694,10 @@ function paintFire(){
   else if(fireNow === "held"){ t = "GUNS HELD — "+(arcHeld ? ROLE_WORD[arcHeld.role] : "A FLAG")+" IN THE ARC<br>TAP IT ON THE CROW'S NEST TO FIRE ON IT"; cls = "dry"; }
   else if(fireNow === "firing"){ t = LASERS[k].name+"<br>"+(pSide < 0 ? "PORT" : "STARBOARD")+" BROADSIDE"; cls = "hot"; }
   else { const L = LASERS[k];
-    t = '<div style="text-align:center"><span style="display:block;font-size:8px">&#9664; PORT &nbsp;&middot;&nbsp; STARBOARD &#9654;</span>'+
+    t = '<div style="text-align:center">'+                                                   /* SEA-K: the PORT · STARBOARD line is the cannons now */
         '<span style="display:block;font-size:9px;letter-spacing:.04em;margin:3px 0">'+arcWord(L,-1)+" &nbsp;|&nbsp; "+arcWord(L,1)+'</span>'+
         '<span style="display:block;font-size:8px;opacity:.6">'+L.name+" &mdash; HOLD</span></div>"; }
-  if(t !== fireText){ fireEl.innerHTML = t; fireText = t; }
+  if(t !== fireText){ fireTxt.innerHTML = t; fireText = t; }      /* SEA-K: into the text layer; the art layer is never replaced */
   if(cls !== fireCls){
     fireEl.classList.toggle("hot", cls === "hot");
     fireEl.classList.toggle("dry", cls === "dry");
@@ -7909,6 +8046,8 @@ function syncUI(){
   document.getElementById("tRefill").classList.toggle("on",T.contactRefill);          /* 092b */
   document.getElementById("bPadFire").classList.toggle("on",T.padFire !== "off");
   document.getElementById("bPadFire").textContent = "PAD FIRE: "+T.padFire.toUpperCase();
+  document.getElementById("bGunDeck").classList.toggle("on", gunDeck() !== "none");          /* SEA-K v1.0, OL-24 */
+  document.getElementById("bGunDeck").textContent = "GUN DECK: "+gunDeck().toUpperCase();
   syncDev(); paintTuneVals(); writeReport();
 }
 for(const [sid,vid,key,dp] of map){
@@ -7933,6 +8072,12 @@ toggle("tRefill","contactRefill");                                 /* 092b, S271
 document.getElementById("bPadFire").addEventListener("click",function(){
   const o = ["off","single","double"];
   T.padFire = o[(o.indexOf(T.padFire)+1) % o.length];
+  saveT(); syncUI();
+});
+/* SEA-K v1.0, OL-24. Four layouts, so it cycles. */
+document.getElementById("bGunDeck").addEventListener("click",function(){
+  const o = ["none","bow","stern","both"];
+  T.gunDeck = o[(o.indexOf(gunDeck())+1) % o.length];
   saveT(); syncUI();
 });
 
@@ -8151,6 +8296,7 @@ function writeReport(){
     "their damage  "+Math.round(theirScale()*100)+"% of COMBAT §4.1  (spec 100)  [ASSUMED] S274, S275 — 097a\n"+
     "sea fight     "+seaFightLine()+"\n"+
     "ships refill  "+(T.contactRefill ? "ON — shields +"+RECHARGE_SHIELD+"/s, as 092a" : "off")+"  [ASSUMED] S271\n"+
+    "gun deck      "+gunDeckLine()+"\n"+                                                      /* SEA-K v1.0, OL-24 */
     "pad fire      "+T.padFire+"  ·  hold "+T.grace+" ms  ·  quick touch "+T.tapMs+" ms, "+T.tapMove+" px  [ASSUMED]"+
        "  ·  fight mode now: "+(fightMode() ? "ON" : "off")+
        "  ·  "+padStats.holds+" holds, "+padStats.returns+" came back in time, "+padStats.taps+" quick touches, "+
