@@ -178,7 +178,16 @@
   .ring,.dot,.stem{position:absolute;pointer-events:none;
     opacity:0;transition:opacity .5s linear;}
   .live .ring,.live .dot,.live .stem{opacity:1;transition:none;}
-  .ring{width:0;height:0;border:1px solid var(--ink-dim);border-radius:50%;}
+  .ring{width:0;height:0;border-radius:50%;transform-origin:50% 50%;}   /* sea-j v3.0: no border — the SVG wheel inside is the picture */
+  .ring svg{display:block;overflow:visible;}
+  .ring .wspokes line{stroke:var(--ink-dim);stroke-width:3;stroke-linecap:round;}
+  .ring .wrim{fill:none;stroke:var(--ink-dim);stroke-width:7;}
+  .ring .wrim2{fill:none;stroke:var(--ink-faint);stroke-width:1.5;}
+  .ring .whandles circle{fill:var(--ink-dim);}
+  .ring .wking{fill:var(--ink);}
+  .ring .whub{fill:#0a0c10;stroke:var(--ink-dim);stroke-width:3;}
+  .ring .whub2{fill:var(--ink-dim);}
+  .live .stem{opacity:.35;}
   .dot{width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;
        background:var(--ink);opacity:0;}
   .live .dot{opacity:.9;}
@@ -1007,7 +1016,24 @@
   <div class="controls" id="controls">
     <div class="pad" id="pad">
       <div class="padhint">TOUCH ANYWHERE — DRAG LEFT OR RIGHT FOR THE HELM</div>
-      <div class="ring" id="ring"></div>
+      <!-- sea-j v3.0, OL-19 ([DECISION], Ripley, 1 Nov 2026): the ring is a SHIP'S WHEEL. Same
+           touch, same drag, same dead zone and deflection — only the picture changed. It turns
+           with the helm: starboard helm, clockwise, ±90° at full deflection; the king spoke
+           (the marked one) stands up at midships. The stem and the dot stay, faint, so how far
+           the thumb has moved is still readable under it. -->
+      <div class="ring" id="ring"><svg viewBox="-100 -100 200 200" width="100%" height="100%" aria-hidden="true">
+        <g class="wspokes">
+          <line x1="0" y1="-100" x2="0" y2="100"/><line x1="-100" y1="0" x2="100" y2="0"/>
+          <line x1="-70.7" y1="-70.7" x2="70.7" y2="70.7"/><line x1="70.7" y1="-70.7" x2="-70.7" y2="70.7"/>
+        </g>
+        <circle class="wrim" r="76"/><circle class="wrim2" r="62"/>
+        <g class="whandles">
+          <circle cx="0" cy="-100" r="4.5"/><circle cx="0" cy="100" r="4.5"/><circle cx="-100" cy="0" r="4.5"/><circle cx="100" cy="0" r="4.5"/>
+          <circle cx="-70.7" cy="-70.7" r="4.5"/><circle cx="70.7" cy="70.7" r="4.5"/><circle cx="70.7" cy="-70.7" r="4.5"/><circle cx="-70.7" cy="70.7" r="4.5"/>
+        </g>
+        <rect class="wking" x="-4" y="-96" width="8" height="14" rx="2"/>
+        <circle class="whub" r="13"/><circle class="whub2" r="5"/>
+      </svg></div>
       <div class="stem" id="stem"></div>
       <div class="dot" id="dot"></div>
     </div>
@@ -1578,7 +1604,7 @@
    THIS IS THE ONLY PLACE THE ID IS WRITTEN: the <title> and the TUNE report header
    both read it. Bump this line and nothing else. The delivered file carries it as a
    suffix (index_sea-j_v1.1.html); the repo holds index.html. */
-const BUILD = "sea-j · v2.0";
+const BUILD = "sea-j · v3.0";
 document.title = "SEA DOGS "+BUILD+" — pirate reskin of ELITE: THE CLONES 110c";
 
 /* ------------------------------------------------------------------
@@ -4147,12 +4173,19 @@ function computeAxes(){
   }
 }
 
+/* sea-j v3.0, OL-19: the wheel's angle is the helm — rollIn, the same number the
+   sailing model reads — so the picture and the rudder cannot disagree. Called from
+   drawPad on every touch and once a frame from the loop, so the fight-mode hold and
+   the ramp-down after a lift turn the wheel too. */
+const WHEEL_DEG = 90;                                      /* at full deflection, [ASSUMED] */
+function wheelTurn(){ ring.style.transform = "rotate("+(rollIn*WHEEL_DEG).toFixed(1)+"deg)"; }
 function drawPad(){
   const r=pad.getBoundingClientRect();
   const lx=ox-r.left, ly=oy-r.top, px=cx-r.left, py=cy-r.top;
   const d=T.defl;
   ring.style.left=(lx-d)+"px"; ring.style.top=(ly-d)+"px";
   ring.style.width=(d*2)+"px"; ring.style.height=(d*2)+"px";
+  wheelTurn();                                            /* sea-j v3.0, OL-19 */
   dot.style.left=px+"px"; dot.style.top=py+"px";
   const dx=px-lx, dy=py-ly, len=Math.hypot(dx,dy);
   stem.style.left=lx+"px"; stem.style.top=ly+"px";
@@ -7693,6 +7726,7 @@ function frame(now){
 
   seaT += dt;                            /* SEA DOGS: the swell and the lamps keep time even while the world holds */
   lookStep(dt);
+  wheelTurn();                           /* sea-j v3.0, OL-19: the wheel follows the helm through the hold and the ramp-down */
   wildStep(dt);                          /* sea-h: the gulls, the pod, the orcas, the fish */
   if(boxChanged()) resize();             /* sea-h: a viewport that settled without a resize event */
   render();
