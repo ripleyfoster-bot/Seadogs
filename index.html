@@ -7,7 +7,13 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#050709">
-<title>SEA DOGS sea-i — pirate reskin of ELITE: THE CLONES 110c</title>
+<title>SEA DOGS — pirate reskin of ELITE: THE CLONES 110c</title>
+<!-- sea-j · v1.1, 1 Nov 2026: THE BUILD ID IS NOT WRITTEN HERE ANY MORE. It is
+     the one constant `BUILD` at the top of the script, which sets
+     document.title at boot and prints the report header — one edit moves
+     both markers (BUILD CONVENTION, 1 Nov 2026). S71's two-literals-2,000-
+     lines-apart is closed by this. -->
+
 <!-- S71, session 039. THREE BUILDS WERE PUBLISHED THIS SESSION READING
      037e. 039a, 039b and 039c each changed the report function and none
      bumped either marker, so S57's arrival check — read the header in
@@ -1558,6 +1564,15 @@
 
 <script>
 "use strict";
+
+/* THE BUILD MARKER — BUILD CONVENTION, Ripley, 1 Nov 2026: `sea-<letter> · v<number>.<decimal>`.
+   Letter = major (new module, structural change); number = a tweak; decimal = an
+   iteration of that tweak. A letter move resets the rest (sea-j · v2.8 -> sea-k · v1.0).
+   THIS IS THE ONLY PLACE THE ID IS WRITTEN: the <title> and the TUNE report header
+   both read it. Bump this line and nothing else. The delivered file carries it as a
+   suffix (index_sea-j_v1.1.html); the repo holds index.html. */
+const BUILD = "sea-j · v1.1";
+document.title = "SEA DOGS "+BUILD+" — pirate reskin of ELITE: THE CLONES 110c";
 
 /* ------------------------------------------------------------------
    SEA DOGS — THE PIRATE RESKIN. A presentation-layer swap on ELITE: THE
@@ -6633,6 +6648,7 @@ function wrap(v){ const m=((v+CELL)%(2*CELL)+2*CELL)%(2*CELL)-CELL; return m; }
    ================================================================== */
 const CAM_H = 24, CAM_PITCH = 7*Math.PI/180, DRAW_RANGE = CELL*1.35, LOOK_DEG = 80, LOOK_RATE = 260*Math.PI/180;
 let seaT = 0, lookOff = 0;
+let jibSide = 1;                            /* sea-j, OL-16: which rail the jib is sheeted to, +1 starboard. Runtime, never saved */
 const INK = [233,207,143];
 const SKY_TOP = [8,12,30], SKY_HOR = [58,78,122], SKY_WARM = [122,92,86];
 const SEA_HOR = [34,58,92], SEA_BOT = [8,22,40], HAZE = [58,78,122];
@@ -7296,6 +7312,30 @@ function render(){
     segCam(pt([0,4,-6]), pt([0,40,-6]), hw, hh);
     segCam(pt([-10,27,-6]), pt([10,27,-6]), hw, hh);
     ctx.stroke();
+    /* SEA-J, OL-16 — THE JIB ([DECISION], Ripley, 1 Nov 2026: "yes, a foresail,
+       low and to one side: a jib off the bowsprit, kept out of the centre of
+       the view"). A fore-and-aft triangle: tack on the bowsprit, head low on
+       the forestay, clew sheeted aft to the LEE rail — the side the wind
+       blows toward, read from the wind in the ship's frame (the other ships'
+       square sails use the same read, along the keel; a jib bellies across
+       it). The luff is a line on the centreline; the body of the sail is all
+       to one side. The side holds through a dead zone so it does not flap
+       about with the wind near dead ahead or astern; it crosses when the
+       ship does. Every figure [ASSUMED], this build's. Presentation only —
+       nothing written, nothing saved. */
+    { const wl = qrot(qconj(q), wind.dir);
+      if(Math.abs(wl[0]) > 0.12) jibSide = wl[0] > 0 ? 1 : -1;
+      const lee = jibSide, belly = 0.35 + 0.65*Math.min(1, Math.abs(wl[0]));
+      /* tack · head · leech belly · clew · foot belly — the leech bows out to leeward, the foot sags */
+      const jib = [pt([0,9.5,33]), pt([0,19,17]), pt([lee*(7+6*belly),12.5,11]), pt([lee*9,7.2,-3]), pt([lee*(6+4*belly),7.5,14])];
+      if(pathCam(jib, hw, hh)){ ctx.fillStyle = rgb(SAIL_RGB, 0.92); ctx.fill();
+        ctx.strokeStyle = rgb(shade(SAIL_RGB, 0.72), 0.6); ctx.lineWidth = 1; ctx.stroke(); }
+      /* the belly's shadow: the aft half, a touch darker, as the square sails have */
+      const sh = [pt([0,19,17]), pt([lee*(7+6*belly),12.5,11]), pt([lee*9,7.2,-3]), pt([lee*4,7.4,8]), pt([0,14.2,25])];
+      if(pathCam(sh, hw, hh)){ ctx.fillStyle = rgb(shade(SAIL_RGB, 0.82), 0.45); ctx.fill(); }
+      /* the sheet: clew to the deck */
+      ctx.strokeStyle = rgb(INK, 0.3); ctx.beginPath(); segCam(pt([lee*9,7.2,-3]), pt([lee*10,6.4,-14]), hw, hh); ctx.stroke();
+    }
     /* SEA-H DETAIL: two of your own hands walked the deck ahead in the third cut — Ripley, 21:53: "annoying". Gone; the other ships keep theirs. */
     /* your broadside: the flash from the rail on that side, and the smoke */
     if(pShow > 0){ const k = pShow/SHOT_SHOW, s = pSide;
@@ -7986,7 +8026,7 @@ function overrideLine(){
 }
 function writeReport(){
   lastReport =
-    "SEA DOGS sea-i — pirate reskin of ELITE: THE CLONES 110c — settings\n"+   /* 109b, S353: this line read 108f in 109a — the one marker the title tag did not move. 110a: both markers grepped before export (s110 §0) */
+    "SEA DOGS "+BUILD+" — pirate reskin of ELITE: THE CLONES 110c — settings\n"+   /* sea-j: reads the one constant BUILD. 109b, S353: this line read 108f in 109a — the one marker the title tag did not move. 110a: both markers grepped before export (s110 §0) */
     "deadzone      "+T.dead+" px  (spec 6)\n"+
     "deflection    "+T.defl+" px  (spec 55)\n"+
     "exponent      "+T.exp.toFixed(1)+"     (spec 1.6)\n"+
