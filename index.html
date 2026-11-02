@@ -1350,9 +1350,7 @@
   <div class="toggles">
     <button id="tRefill">SHIPS' SHIELDS REFILL</button>
     <button id="bPadFire">PAD FIRE</button>
-    <button id="bGunDeck">GUN DECK</button>
   </div>
-  <div class="note" style="font-size:9px;color:#3d3120;margin-top:-8px">GUN DECK — sea-k v1.0, OL-24: which chasers the fire zone draws. A <b>preview</b>: no chaser exists yet (OL-6), so a bow or stern band lights its cannon and fires nothing. NONE is the game.</div>
   <div class="note" style="font-size:9px;color:#3d3120;margin-top:-8px">
     SHIPS' SHIELDS REFILL lit = every other ship's shields refill at +4 a second, as yours do —
     092a's behaviour, under which a pack of five could not be beaten on 4 October (1,160 points
@@ -1400,7 +1398,7 @@
        §5.3 prices it at 400.0 CR). devFitLaser() in the script carries
        the reasoning. -->
   <div class="row">
-    <div class="acts" style="margin-top:0"><button id="bLaser">FIT 6-POUNDERS (PULSE LASER)</button></div>
+    <div class="acts" style="margin-top:0"><button id="bLaser">FIT 6-POUNDERS (PULSE LASER)</button><button id="bChaser">FIT BOW CHASER (6-PDR)</button></div>
     <div class="note">Dev control, not a purchase. Fits <b>one pulse laser to the fore mount</b>
     and saves at once. One way — nothing here takes it off again; <b>an ejection does</b>
     (100a). <b>A commander created by 092a or later starts with one</b>; a save from before
@@ -1633,7 +1631,7 @@
    THIS IS THE ONLY PLACE THE ID IS WRITTEN: the <title> and the TUNE report header
    both read it. Bump this line and nothing else. The delivered file carries it as a
    suffix (index_sea-j_v1.1.html); the repo holds index.html. */
-const BUILD = "sea-k · v1.1";
+const BUILD = "sea-k · v2.0";
 document.title = "SEA DOGS "+BUILD+" — pirate reskin of ELITE: THE CLONES 110c";
 
 /* ------------------------------------------------------------------
@@ -1740,11 +1738,8 @@ const SPEC = { dead:6, defl:55, exp:1.6,
                                             NEW KEY: a stored tuning from 107a has none and reads this. */
                bsRange:230, bsSlot:90, breakRange:90, breakSec:3, bendReach:140, scatterDeg:3.5,   /* SEA-F: the fight's six figures, all [ASSUMED], on TUNE sliders */
                padFire:"double",         /* 092b, loop 65 (B) and the gesture decision (C): off | single | double */
-               gunDeck:"none",           /* SEA-K v1.0, OL-24: WHICH CHASERS THE GUN DECK DRAWS — none | bow | stern | both.
-                                            A PREVIEW. No chaser exists yet (OL-6); this key stands in for the fitted
-                                            guns so the four layouts can be seen on the device. When OL-6 lands, the
-                                            layout reads the equipment and this key goes. NEW KEY: a stored tuning
-                                            from sea-j has none and reads this. gunDeck() validates. */
+               /* sea-k v2.0, OL-6: `gunDeck` (v1.0's preview key) IS RETIRED — the gun deck
+                  reads the fitted chasers. A stored tuning that still carries it is ignored. */
                /* 092c. `tapGap` (092b, 200) IS RETIRED AND RENAMED, ON PURPOSE. A stored
                   tuning outranks a changed constant (S52's shape), and 092b stored 200 on
                   the device — so a new default under the old key would never be read.
@@ -4539,7 +4534,10 @@ let fireChaser = null;                                  /* SEA-K v1.0, OL-24: "b
    Thirds across the width were drawn and ruled out — bow and stern came to
    31 px each. Ruled by Ripley on the mock-up, 1 Nov 2026. */
 const GUN_BAND = 56;                                     /* px, the chaser band's height — a thumb and a little, [ASSUMED] */
-function gunDeck(){ const v = T.gunDeck; return (v === "bow" || v === "stern" || v === "both") ? v : "none"; }
+/* sea-k v2.0, OL-6: the layout is READ FROM THE EQUIPMENT — a bow band when a
+   bow chaser is fitted. The stern band waits on a stern chaser (v3.0, with or
+   after OL-5's aft view); the drawing and the touch test for it stand. */
+function gunDeck(){ const b = !!bowChaser(), st = false; return b && st ? "both" : b ? "bow" : st ? "stern" : "none"; }
 function gunDeckHas(which){ const g = gunDeck(); return g === which || g === "both"; }
 function sideFromX(x){
   const r = fireEl.getBoundingClientRect();
@@ -4552,10 +4550,11 @@ function zoneFromXY(x, y){
   return sideFromX(x);
 }
 /* A touch in a chaser band OWNS the zone (the halves cannot fire under it)
-   and lights its cannon, BUT FIRES NOTHING: there is no chaser to fire until
-   OL-6. OL-6's hook is here — set the trigger and give playerFire() the gun.
-   The bow band turns the head to the bow (lookGuns(0)); the stern band
-   leaves the head where it is, since there is no aft view (OL-5). */
+   and lights its cannon. sea-k v2.0, OL-6: THE BOW BAND IS THE BOW CHASER'S
+   TRIGGER — chaserFire() reads `fireChaser === "bow"` each frame, as
+   playerFire() reads `trigger`. The bow band turns the head to the bow
+   (lookGuns(0)); a stern band (no gun yet) leaves the head where it is,
+   since there is no aft view (OL-5). */
 function fireDown(x, y, id){
   const z = zoneFromXY(x, y);
   fireTouch = id;
@@ -4917,6 +4916,7 @@ function combatStep(dt){
   if(state.ship.hull > 0){
     contactsStep(dt);
     playerFire(dt);
+    chaserFire(dt);                        /* sea-k v2.0, OL-6: the bow chaser, its own trigger and reload */
     shotsStep(dt);                         /* SEA DOGS: every ball in the air, theirs and yours */
     debrisStep(dt);
     recharge(dt);
@@ -5655,6 +5655,34 @@ const LASERS = Object.freeze({
   military: Object.freeze({ damage:14, rate:0.33, energy:14, range:620, continuous:false, balls:6, name:"24-POUNDERS" })
 });
 const LASER_PICK = ["military","beam","pulse","mining"];   /* decision 6. [ASSUMED] */
+/* ==================================================================
+   SEA-K v2.0 — OL-6, THE BOW CHASER. Rulings, Ripley, 2 Nov 2026 (three,
+   one at a time): bow only this cut; one Shipwright row a calibre; it
+   LAYS on a ship ahead and fires blind ahead otherwise, as the
+   broadsides do. ONE GUN on the bow, the calibre's row of LASERS for
+   its ball, range and reload; POWDER is the battery's a broadside
+   divided by its guns, rounded up (6-pdr 2, 12-pdr 2, 24-pdr 3) —
+   [ASSUMED]. It fires inside CHASER_CONE either side of the bow,
+   [ASSUMED]. Its own reload (`cCool`), independent of the broadsides'.
+   THE ID IS NEW: `<key>ChaserBow` — the space game has no bow mount
+   (its fore mount IS the broadside battery here). Qualified `core:` at
+   the save boundary like every id; the loader keeps whatever
+   `equipment` holds (ruling 1), so `schema` stays 5 and a file opens
+   either side. An ejection takes it with everything else (100a).
+   ================================================================== */
+const CHASER_CONE = 10;                                    /* deg either side of the bow, [ASSUMED] */
+const CHASER_KEYS = ["military","beam","pulse"];           /* the three calibres sold; swivels are not a chaser */
+function bowChaser(){
+  for(const k of CHASER_KEYS){ const e = state.equipment[k+"ChaserBow"]; if(e && e.qty > 0) return k; }
+  return null;
+}
+function chaserPowder(L){ return Math.max(1, Math.ceil(L.energy / L.balls)); }
+function devFitChaser(){                                   /* dev control — devFitLaser()'s shape, NOT A PRICE */
+  if(bowChaser()) return false;
+  state.equipment.pulseChaserBow = { qty:1 };
+  saveGame();
+  return true;
+}
 const PIRATE_FIRE_RANGE = 1200;                /* a contact thinks about its guns inside this; they BEAR by pirateFire()'s own test */
 const PIRATE_FIRE_CONE  = 15*Math.PI/180;      /* the space game's; read by nothing at sea */
 const BOUNTY_STEP       = 100;                 /* tenths CR per (dangerRating + 1). [ASSUMED] §5.4 */
@@ -6483,6 +6511,90 @@ function playerFire(dt){
   fireStats.shots++;
 }
 
+/* SEA-K v2.0, OL-6 — THE BOW CHASER, PER FRAME. playerFire()'s shape for
+   one gun on the bow. `fireChaser === "bow"` (the band held) is its
+   trigger. The target: the nearest-to-the-bow ship inside CHASER_CONE
+   and the calibre's range that MAY be laid on (OL-4's flag rule,
+   mayLayOn); a ship in the padded cone that may not be laid on HOLDS
+   the gun and the zone says why. With a target the ball is laid with
+   layGuns()'s lead; without, it goes straight down the bow line at
+   full range. `cNow` is what the zone prints. */
+let cCool = 0, cShow = 0, cNow = "idle", chaserArcHeld = null;
+const chaserStats = { shots:0, held:0 };
+function chaserCone(pad){
+  const out = [], bo = CHASER_CONE*Math.PI/180 + (pad ? ARC_PAD : 0);
+  for(const c of contacts){
+    const rel = [wrap(c.pos[0]-pos[0]), 0, wrap(c.pos[2]-pos[2])];
+    const d = Math.hypot(rel[0], rel[2]);
+    if(d < 1e-6) continue;
+    const l = qrot(qconj(q), rel);
+    if(l[2] <= 0) continue;                                 /* astern */
+    const off = Math.atan2(Math.abs(l[0]), l[2]);
+    if(off > bo) continue;
+    out.push({ c:c, d:d, off:off });
+  }
+  return out;
+}
+function chaserTarget(L){
+  let best = null, bo = Infinity; chaserArcHeld = null;
+  for(const e of chaserCone(true)){
+    if(e.d > L.range*RANGE_PAD) continue;
+    if(!mayLayOn(e.c)){ if(!chaserArcHeld) chaserArcHeld = e.c; continue; }
+    if(e.off > CHASER_CONE*Math.PI/180 || e.d > L.range) continue;
+    if(e.off < bo){ best = e.c; bo = e.off; }
+  }
+  if(best) chaserArcHeld = null;
+  return best;
+}
+function fireChaserShot(bq, bpos, bvel, L, aim){
+  const r = rng(hash32(WORLD_SEED, shotSeq++, SHOT_TAG));
+  const fwd = qrot(bq,[0,0,1]);
+  const base = aim ? aim.dir : fwd;
+  const v0 = muzzleV(aim ? Math.min(L.range, aim.dist) : L.range);
+  const SC = tn("scatterDeg",0,12)*Math.PI/180;
+  const yawJ = (r()-0.5)*2*SC, elJ = (r()-0.5)*2*SC*0.35;
+  const ca = Math.cos(yawJ), sa = Math.sin(yawJ);
+  const dir = [base[0]*ca - base[2]*sa, 0, base[0]*sa + base[2]*ca];
+  const el = CANNON_ELEV + elJ;
+  shots.push({ owner:"player",
+               p:[bpos[0] + fwd[0]*HIT_R*0.9, MUZZLE_H, bpos[2] + fwd[2]*HIT_R*0.9],   /* the bow */
+               v:[dir[0]*v0*Math.cos(el) + bvel[0], v0*Math.sin(el), dir[2]*v0*Math.cos(el) + bvel[2]],
+               dmg:L.damage, raw:L.damage, age:0 });
+}
+function chaserFire(dt){
+  const sh = state.ship;
+  cCool = Math.max(-dt, cCool - dt);
+  if(cShow > 0) cShow = Math.max(0, cShow - dt);
+  const key = bowChaser();
+  if(!key){ cNow = "none"; return; }
+  const held = fireTouch !== null && fireChaser === "bow";
+  if(!held){ cNow = "idle"; return; }
+  const L = LASERS[key], pw = chaserPowder(L);
+  if(sh.energy < pw){ cNow = "noEnergy"; return; }
+  const t = chaserTarget(L);
+  if(!t && chaserArcHeld){ cNow = "held"; return; }
+  cNow = "firing";
+  chaserStats.held += dt;
+  if(cCool > 1e-9) return;
+  cCool += 1 / L.rate;
+  sh.energy -= pw;
+  const fwd = qrot(q,[0,0,1]), vel = [fwd[0]*speed, 0, fwd[2]*speed];
+  let aim = null;
+  if(t){ const tf = qrot(t.q,[0,0,1]); aim = layGuns(pos, t.pos, [tf[0]*t.speed, 0, tf[2]*t.speed], L); }
+  fireChaserShot(q, pos, vel, L, aim);
+  cShow = SHOT_SHOW; lastShotT = seaT;
+  padShotBowT = seaT;                                      /* the gun deck's shot, on the bow gun */
+  chaserStats.shots++;
+}
+function chaserLine(){
+  const k = bowChaser();
+  if(!k) return "bow mount EMPTY — buy one at the Shipwright (a row a calibre) or FIT BOW CHASER, above";
+  const L = LASERS[k];
+  return "bow: "+k+" — one gun, "+L.damage+" a ball, reload "+(1/L.rate).toFixed(1)+" s, "+chaserPowder(L)+" powder a shot, range "+L.range+
+         "  ·  cone "+CHASER_CONE+" deg either side of the bow  [ASSUMED]"+
+         "  ·  "+(chaserStats.shots ? chaserStats.shots+" shots, held "+chaserStats.held.toFixed(1)+" s" : "not fired this session")+"  ·  sea-k v2.0";
+}
+
 /* 097a — THEIR DAMAGE ON A TUNE SLIDER. The s097 handover's job a,
    Ripley's letter, 6 October 2026. Answers S274 and S275; COMBAT §18
    names both as "Tuning". [BUILT] 6 October 2026 — as exported, 097a
@@ -6710,18 +6822,37 @@ function litGuns(){
       q.burst.setAttribute("opacity", (k < 0.5 ? 1 : 1 - (k - 0.5) * 2).toFixed(2)); }
     if(on){ q.ball.setAttribute("cx", (50 + PAD_BALL_PX * (age / PAD_SHOT)).toFixed(1));   /* starts clear of the rays' tips */ }
   });
+  /* sea-k v2.0: the bow gun's shot, same drawing, its own clock */
+  { const q = art.bow, a = seaT - padShotBowT, on = a >= 0 && a < PAD_SHOT, bon = on && a < PAD_BURST;
+    q.ball.setAttribute("visibility", on ? "visible" : "hidden");
+    q.burst.setAttribute("visibility", bon ? "visible" : "hidden");
+    if(bon){ const k = a / PAD_BURST, sc = k < 0.4 ? 0.6 + k : 1 + (k - 0.4) * 0.25;
+      q.burst.setAttribute("transform", "translate(30 0) scale("+sc.toFixed(2)+") translate(-30 0)");
+      q.burst.setAttribute("opacity", (k < 0.5 ? 1 : 1 - (k - 0.5) * 2).toFixed(2)); }
+    if(on) q.ball.setAttribute("cx", (50 + PAD_BALL_PX * (a / PAD_SHOT)).toFixed(1)); }
 }
 const PAD_SHOT = 0.5, PAD_BURST = 0.25, PAD_BALL_PX = 44;   /* s, s, px in the gun's own units — [ASSUMED], from the mock-up's loop */
-let padShotT = -1e9, padShotSide = 0;                       /* runtime, never saved */
+let padShotT = -1e9, padShotSide = 0, padShotBowT = -1e9;   /* runtime, never saved */
 function gunDeckLine(){
   const g = gunDeck();
-  return "preview "+g+"  ·  shot: rays "+PAD_BURST+" s, ball "+PAD_SHOT+" s / "+PAD_BALL_PX+" px"+"  ·  band "+GUN_BAND+" px  ·  zone "+artW+"x"+artH+" px  ·  broadsides' region "+(artH - (gunDeckHas("bow") ? GUN_BAND : 0) - (gunDeckHas("stern") ? GUN_BAND : 0))+" tall"+
-         (fireChaser ? "  ·  "+fireChaser+" band held (fires nothing until OL-6)" : "")+"  [ASSUMED] sea-k v1.1";
+  return "layout "+g+" (from the equipment)  ·  shot: rays "+PAD_BURST+" s, ball "+PAD_SHOT+" s / "+PAD_BALL_PX+" px"+"  ·  band "+GUN_BAND+" px  ·  zone "+artW+"x"+artH+" px  ·  broadsides' region "+(artH - (gunDeckHas("bow") ? GUN_BAND : 0) - (gunDeckHas("stern") ? GUN_BAND : 0))+" tall"+
+         (fireChaser ? "  ·  "+fireChaser+" band held" : "")+"  [ASSUMED] sea-k v2.0";
 }
 function paintFire(){
   layoutFireArt(); litGuns();
   const k = foreLaser();
   let t, cls = "";
+  /* sea-k v2.0, OL-6: the bow band held — the zone speaks for the chaser */
+  if(fireTouch !== null && fireChaser === "bow"){
+    const ck = bowChaser();
+    if(!ck){ t = "NO BOW CHASER"; cls = "dry"; }
+    else if(cNow === "noEnergy"){ t = "BOW CHASER<br>NO POWDER"; cls = "dry"; }
+    else if(cNow === "held"){ t = "CHASER HELD — "+(chaserArcHeld ? ROLE_WORD[chaserArcHeld.role] : "A FLAG")+" AHEAD<br>TAP IT ON THE CROW'S NEST TO FIRE ON IT"; cls = "dry"; }
+    else { t = LASERS[ck].name+"<br>BOW CHASER"; cls = "hot"; }
+    if(t !== fireText){ fireTxt.innerHTML = t; fireText = t; }
+    if(cls !== fireCls){ fireEl.classList.toggle("hot", cls === "hot"); fireEl.classList.toggle("dry", cls === "dry"); fireCls = cls; }
+    return;
+  }
   if(!k){ t = "NO GUNS"; cls = "dry"; }
   else if(fireNow === "noEnergy"){ t = LASERS[k].name+"<br>NO POWDER"; cls = "dry"; }
   else if(fireNow === "held"){ t = "GUNS HELD — "+(arcHeld ? ROLE_WORD[arcHeld.role] : "A FLAG")+" IN THE ARC<br>TAP IT ON THE CROW'S NEST TO FIRE ON IT"; cls = "dry"; }
@@ -6756,7 +6887,7 @@ function laserLine(){
   const L = LASERS[k];
   return "fore: "+k+" — "+L.damage+" a hit, "+L.rate+"/s, "+L.energy+" energy/s held, range "+L.range+
          (L.continuous ? ", continuous" : "")+"  ·  cone "+T.laserCone+" deg either side (spec 2), nearest the nose  [ASSUMED]"+
-         "  ·  aft mount not built";
+         "  ·  bow chaser: its own line below  ·  aft mount not built";
 }
 function fireLine(){
   if(!(fireStats.held > 0)) return "not fired this session";
@@ -7607,6 +7738,14 @@ function render(){
       ctx.globalAlpha = 1;
     }
     /* SEA-H DETAIL: two of your own hands walked the deck ahead in the third cut — Ripley, 21:53: "annoying". Gone; the other ships keep theirs. */
+    /* sea-k v2.0, OL-6: the bow chaser's flash — at the bow, under the bowsprit, smaller than a broadside's */
+    if(cShow > 0){ const k = cShow/SHOT_SHOW;
+      const g = ctx.createRadialGradient(hw, H*0.6, 3, hw, H*0.6, W*0.22);
+      g.addColorStop(0, "rgba(255,190,90,"+(0.8*k).toFixed(2)+")"); g.addColorStop(0.4, "rgba(255,130,50,"+(0.3*k).toFixed(2)+")"); g.addColorStop(1, "rgba(255,120,40,0)");
+      ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+      for(let i=0;i<3;i++){ const p = pt([(i-1)*3, 6+(1-k)*8, 46+(1-k)*18+i*4]); if(p[2] > NEAR){ const r = Math.max(2, F*(4+(1-k)*7)/p[2]);
+        ctx.fillStyle = "rgba(210,210,215,"+(0.4*k).toFixed(2)+")"; ctx.beginPath(); ctx.arc(hw+F*p[0]/p[2], hh-F*p[1]/p[2], r, 0, Math.PI*2); ctx.fill(); } }
+    }
     /* your broadside: the flash from the rail on that side, and the smoke */
     if(pShow > 0){ const k = pShow/SHOT_SHOW, s = pSide;
       const g = ctx.createRadialGradient(hw + s*W*0.42, H*0.78, 4, hw + s*W*0.42, H*0.78, W*0.45);
@@ -8079,8 +8218,7 @@ function syncUI(){
   document.getElementById("tRefill").classList.toggle("on",T.contactRefill);          /* 092b */
   document.getElementById("bPadFire").classList.toggle("on",T.padFire !== "off");
   document.getElementById("bPadFire").textContent = "PAD FIRE: "+T.padFire.toUpperCase();
-  document.getElementById("bGunDeck").classList.toggle("on", gunDeck() !== "none");          /* SEA-K v1.0, OL-24 */
-  document.getElementById("bGunDeck").textContent = "GUN DECK: "+gunDeck().toUpperCase();
+
   syncDev(); paintTuneVals(); writeReport();
 }
 for(const [sid,vid,key,dp] of map){
@@ -8107,12 +8245,7 @@ document.getElementById("bPadFire").addEventListener("click",function(){
   T.padFire = o[(o.indexOf(T.padFire)+1) % o.length];
   saveT(); syncUI();
 });
-/* SEA-K v1.0, OL-24. Four layouts, so it cycles. */
-document.getElementById("bGunDeck").addEventListener("click",function(){
-  const o = ["none","bow","stern","both"];
-  T.gunDeck = o[(o.indexOf(gunDeck())+1) % o.length];
-  saveT(); syncUI();
-});
+
 
 /* LOOP 63, session 024. Everything TUNE displays is refreshed here, in one
    place, at the only moment a human can read it.
@@ -8164,6 +8297,12 @@ document.getElementById("bShip").addEventListener("click",function(){
 /* 092a. The dev laser. devFitLaser() saves; the repaint is here. */
 document.getElementById("bLaser").addEventListener("click",function(){
   devFitLaser();
+  syncUI();
+});
+/* sea-k v2.0. The dev chaser — devFitLaser()'s shape, so OL-6 can be flown
+   on the commander he has without a purchase. Not a price. */
+document.getElementById("bChaser").addEventListener("click",function(){
+  devFitChaser();
   syncUI();
 });
 /* 100a. The dev pod and REPAIR. Each saves; the repaint is here. The
@@ -8412,6 +8551,7 @@ function writeReport(){
     "sail fade     "+sailFadeLine()+"\n"+                                                      /* sea-j v2.0, OL-18 */
     "lookout       "+lookoutLine()+"  [ASSUMED] sea-h\n"+
     "laser         "+laserLine()+"\n"+
+    "chaser        "+chaserLine()+"\n"+                                                        /* sea-k v2.0, OL-6 */
     "fired         "+fireLine()+"\n"+
     "hits taken    "+takenLine()+"\n"+
     "their lasers  "+theirFireLine()+"\n"+
@@ -10359,6 +10499,13 @@ const SW_BATTERIES = Object.freeze([
   Object.freeze({ key:"beam",     id:"beamLaserFore",     name:"12-pounders",  price:10000, minTech:8  }),  /* EQUIPMENT v1.3 §5.3 — agrees with TUNING_s02's TL 8 */
   Object.freeze({ key:"military", id:"militaryLaserFore", name:"24-pounders",  price:60000, minTech:12 })   /* EQUIPMENT v1.3 §5.3 */
 ]);
+/* sea-k v2.0, OL-6: THE BOW CHASERS — a row a calibre, the battery's gates,
+   a QUARTER of the battery's price (one gun, not four) — [ASSUMED]. */
+const SW_CHASERS = Object.freeze([
+  Object.freeze({ key:"pulse",    id:"pulseChaserBow",    name:"Bow chaser \u00b7 6-pdr",  price:1000,  minTech:3  }),
+  Object.freeze({ key:"beam",     id:"beamChaserBow",     name:"Bow chaser \u00b7 12-pdr", price:2500,  minTech:8  }),
+  Object.freeze({ key:"military", id:"militaryChaserBow", name:"Bow chaser \u00b7 24-pdr", price:15000, minTech:12 })
+]);
 const SW_MODULES = Object.freeze({
   escapePod:       Object.freeze({ id:"escapePod",       name:"Lifeboat",      price:10000, minTech:6  }),  /* EQUIPMENT v1.3 §5.2 */
   dockingComputer: Object.freeze({ id:"dockingComputer", name:"Harbour Pilot", price:15000, minTech:10 })   /* EQUIPMENT v1.3 §5.2 */
@@ -10383,10 +10530,15 @@ function swFittedBattery(){
   return k ? SW_BATTERIES.find(function(b){ return b.key === k; }) || null : null;
 }
 function swModuleFitted(id){ const e = state.equipment[id]; return !!(e && e.qty > 0); }
+function swFittedChaser(){                                  /* sea-k v2.0 */
+  const k = bowChaser();
+  return k ? SW_CHASERS.find(function(b){ return b.key === k; }) || null : null;
+}
 /* list price of every fitted module the Shipwright knows — the transfer base */
 function swFittedList(){
   let t = 0;
   const b = swFittedBattery(); if(b) t += b.price;
+  const c = swFittedChaser();  if(c) t += c.price;        /* sea-k v2.0: it moves with the fittings */
   for(const id of Object.keys(SW_MODULES)) if(swModuleFitted(id)) t += SW_MODULES[id].price;
   return t;
 }
@@ -10396,6 +10548,17 @@ function swFittedList(){
    charge cannot disagree. reasons[] is why CONFIRM is held. ---- */
 function swQuoteBattery(b){
   const fitted = swFittedBattery(), reasons = [];
+  const cost   = swBuyPrice(b.price);
+  const credit = fitted && fitted.key !== b.key ? swSellPrice(fitted.price) : 0;
+  const net    = cost - credit;
+  if(!swOpen()) reasons.push("port");
+  if(swTech() < b.minTech) reasons.push("tech");
+  if(fitted && fitted.key === b.key) reasons.push("fitted");
+  if(net > state.commander.credits) reasons.push("credits");
+  return { cost:cost, credit:credit, net:net, reasons:reasons, fitted:!!(fitted && fitted.key === b.key) };
+}
+function swQuoteChaser(b){                                 /* sea-k v2.0 — swQuoteBattery's shape, on the bow mount */
+  const fitted = swFittedChaser(), reasons = [];
   const cost   = swBuyPrice(b.price);
   const credit = fitted && fitted.key !== b.key ? swSellPrice(fitted.price) : 0;
   const net    = cost - credit;
@@ -10463,6 +10626,34 @@ function sellBattery(){
   swReceipt("sold", b.name, -q.credit);
   saveGame();
   stateChanged("sellBattery");
+  return { ok:true };
+}
+function buyChaser(key){                                   /* sea-k v2.0 — buyBattery's shape */
+  noCascade();
+  const b = SW_CHASERS.find(function(x){ return x.key === key; });
+  if(!b) return fail(["id"]);
+  const q = swQuoteChaser(b);
+  if(q.reasons.length) return fail(q.reasons);
+  const was = swFittedChaser();
+  if(was) delete state.equipment[was.id];
+  state.equipment[b.id] = { qty:1 };
+  state.commander.credits -= q.net;
+  swReceipt("chaser", b.name+(was ? " for "+was.name : ""), q.net);
+  saveGame();
+  stateChanged("buyChaser");
+  return { ok:true };
+}
+function sellChaser(){
+  noCascade();
+  const b = swFittedChaser();
+  if(!b) return fail(["none"]);
+  const q = swQuoteSell(b.price);
+  if(q.reasons.length) return fail(q.reasons);
+  delete state.equipment[b.id];
+  state.commander.credits += q.credit;
+  swReceipt("sold", b.name, -q.credit);
+  saveGame();
+  stateChanged("sellChaser");
   return { ok:true };
 }
 function buyModule(id){
@@ -10844,6 +11035,11 @@ function swRows(){
     h += swRowBtn(id, b.name, swBuyPrice(b.price), tl < b.minTech ? b.minTech : 0, q.fitted ? 'FITTED' : '');
     if(mktOpen === id) h += swBatteryExpansion(b, q);
   }
+  for(const b of SW_CHASERS){                                /* sea-k v2.0 */
+    const id = SW_ROW+"chs:"+b.key, q = swQuoteChaser(b);
+    h += swRowBtn(id, b.name, swBuyPrice(b.price), tl < b.minTech ? b.minTech : 0, q.fitted ? 'FITTED' : '');
+    if(mktOpen === id) h += swChaserExpansion(b, q);
+  }
   for(const mid of Object.keys(SW_MODULES)){
     const m = SW_MODULES[mid], id = SW_ROW+"mod:"+mid, q = swQuoteModule(m);
     h += swRowBtn(id, m.name, swBuyPrice(m.price), tl < m.minTech ? m.minTech : 0, q.fitted ? 'FITTED' : '');
@@ -10872,6 +11068,27 @@ function swBatteryExpansion(b, q){
   } else {
     h += '<div class="mgrp">'+swFigs(['BUY \u00b7 cost '+cr(q.cost)+' CR',
                                      q.credit ? 'less '+cr(q.credit)+' CR for the '+swFittedBattery().name+' coming off' : '',
+                                     'net '+cr(q.net)+' CR \u00b7 you have '+cr(state.commander.credits)+' CR',
+                                     swWhyLine(q.reasons)])+
+         '<button class="mconf" data-act="swbuy" '+(q.reasons.length?'disabled':'')+'>CONFIRM PURCHASE</button></div>';
+  }
+  return h + '</div>';
+}
+function swChaserExpansion(b, q){                          /* sea-k v2.0 — the battery expansion's shape */
+  const L = LASERS[b.key];
+  let h = '<div class="mexp">';
+  h += swFigs(['one gun on the bow \u00b7 '+L.damage+' a ball \u00b7 reload '+(1/L.rate).toFixed(1)+' s',
+               chaserPowder(L)+' powder a shot \u00b7 lays to '+L.range+' u',
+               CHASER_CONE+'\u00b0 either side of the bow']);                /* OL-13: short lines, none past ~40 chars */
+  if(q.fitted){
+    const sq = swQuoteSell(b.price);
+    h += '<div class="mgrp">'+swFigs(['SELL \u00b7 credits '+cr(sq.credit)+' CR',
+                                     'list '+cr(b.price)+' CR less '+swFeePct()+'% fee',
+                                     'leaves the bow empty'])+
+         '<button class="mconf" data-act="swsell">CONFIRM SALE</button></div>';
+  } else {
+    h += '<div class="mgrp">'+swFigs(['BUY \u00b7 cost '+cr(q.cost)+' CR',
+                                     q.credit ? 'less '+cr(q.credit)+' CR for the '+swFittedChaser().name+' coming off' : '',
                                      'net '+cr(q.net)+' CR \u00b7 you have '+cr(state.commander.credits)+' CR',
                                      swWhyLine(q.reasons)])+
          '<button class="mconf" data-act="swbuy" '+(q.reasons.length?'disabled':'')+'>CONFIRM PURCHASE</button></div>';
@@ -11299,6 +11516,9 @@ mktBody.addEventListener("click", function(e){
       if(parts[0] === "bat"){
         if(sa === "swbuy")  buyBattery(parts[1]);
         if(sa === "swsell") sellBattery();
+      } else if(parts[0] === "chs"){                           /* sea-k v2.0 */
+        if(sa === "swbuy")  buyChaser(parts[1]);
+        if(sa === "swsell") sellChaser();
       } else if(parts[0] === "mod"){
         if(sa === "swbuy")  buyModule(parts[1]);
         if(sa === "swsell") sellModule(parts[1]);
