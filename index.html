@@ -148,6 +148,12 @@
   .fireArt{position:absolute;left:0;top:0;width:100%;height:100%;display:block;}
   .fireArt .gun{fill:var(--ink-faint);}
   .fireArt .gun.lit{fill:var(--ink);}
+  /* SEA-K v1.1, OL-24 — THE SHOT: five amber rays at the muzzle and a brass ball
+     on its own, clear of the gun (Ripley's ruling on the mock-up, 2 Nov 2026,
+     ink A). Amber is the one ink on the deck that is not brass. Hidden until
+     the frame a broadside fires; litGuns() scales and fades them off seaT. */
+  .fireArt .burst{stroke:#ffb347;stroke-width:2.2;stroke-linecap:round;fill:none;}
+  .fireArt .ball{fill:var(--ink);}
   .fireArt .zl{stroke:var(--ink-faint);stroke-width:1;stroke-dasharray:3 3;fill:none;}
   .fireArt .gl{fill:var(--ink-faint);font-size:8px;letter-spacing:.14em;font-family:inherit;}
   .fireArt .gl.lit{fill:var(--ink);}
@@ -1627,7 +1633,7 @@
    THIS IS THE ONLY PLACE THE ID IS WRITTEN: the <title> and the TUNE report header
    both read it. Bump this line and nothing else. The delivered file carries it as a
    suffix (index_sea-j_v1.1.html); the repo holds index.html. */
-const BUILD = "sea-k · v1.0";
+const BUILD = "sea-k · v1.1";
 document.title = "SEA DOGS "+BUILD+" — pirate reskin of ELITE: THE CLONES 110c";
 
 /* ------------------------------------------------------------------
@@ -6473,6 +6479,7 @@ function playerFire(dt){
   if(t){ const tf = qrot(t.q,[0,0,1]); aim = layGuns(pos, t.pos, [tf[0]*t.speed, 0, tf[2]*t.speed], L); }
   fireBroadside("player", q, pos, vel, side, L, aim);
   pShow = SHOT_SHOW; pSide = side; lastShotT = seaT; if(lookBy !== "swipe") lookBy = "guns";
+  padShotT = seaT; padShotSide = side;                                   /* SEA-K v1.1: the gun deck's shot */
   fireStats.shots++;
 }
 
@@ -6629,10 +6636,18 @@ function buildFireArt(){
   art.lineTop   = svgEl("line", { "class":"zl" });
   art.lineBot   = svgEl("line", { "class":"zl" });
   art.lineMid   = svgEl("line", { "class":"zl" });
-  art.port  = svgEl("use", { "class":"gun", href:"#gunSym" });
-  art.stbd  = svgEl("use", { "class":"gun", href:"#gunSym" });
-  art.bow   = svgEl("use", { "class":"gun", href:"#gunSym" });
-  art.stern = svgEl("use", { "class":"gun", href:"#gunSym" });
+  /* SEA-K v1.1: a gun is a GROUP — the cannon, the burst and the ball — so the
+     shot inherits the gun's transform (the port gun's mirror, a chaser's turn) */
+  const gun = function(){
+    const g = svgEl("g", {});
+    g.use = svgEl("use", { "class":"gun", href:"#gunSym" }, g);
+    g.burst = svgEl("g", { "class":"burst", visibility:"hidden" }, g);
+    [[34,0,46,0],[33,-4,43,-10],[33,4,43,10],[31,-7,35,-16],[31,7,35,16]].forEach(function(l){
+      svgEl("line", { x1:l[0], y1:l[1], x2:l[2], y2:l[3] }, g.burst); });
+    g.ball = svgEl("circle", { "class":"ball", cx:0, cy:0, r:4.2, visibility:"hidden" }, g);
+    return g;
+  };
+  art.port = gun(); art.stbd = gun(); art.bow = gun(); art.stern = gun();
   art.bowL   = svgEl("text", { "class":"gl", "text-anchor":"start" }); art.bowL.textContent = "BOW";
   art.sternL = svgEl("text", { "class":"gl", "text-anchor":"start" }); art.sternL.textContent = "STERN";
 }
@@ -6646,8 +6661,8 @@ function layoutFireArt(){
   const bow = deck === "bow" || deck === "both", stern = deck === "stern" || deck === "both";
   const y0 = bow ? GUN_BAND : 0, y1 = stern ? h - GUN_BAND : h, rh = y1 - y0;
   const s = Math.max(0.55, Math.min(0.8, rh / 110)), cy = y0 + rh * 0.4;
-  art.port.setAttribute("transform", "translate("+(w*0.27).toFixed(1)+" "+cy.toFixed(1)+") scale(-1 1) scale("+s.toFixed(2)+")");
-  art.stbd.setAttribute("transform", "translate("+(w*0.73).toFixed(1)+" "+cy.toFixed(1)+") scale("+s.toFixed(2)+")");
+  art.port.setAttribute("transform", "translate("+(w*0.29).toFixed(1)+" "+cy.toFixed(1)+") scale(-1 1) scale("+s.toFixed(2)+")");   /* v1.1: 0.27 → 0.29, room for the ball before the edge */
+  art.stbd.setAttribute("transform", "translate("+(w*0.71).toFixed(1)+" "+cy.toFixed(1)+") scale("+s.toFixed(2)+")");
   art.lineMid.setAttribute("x1", w/2); art.lineMid.setAttribute("x2", w/2);
   art.lineMid.setAttribute("y1", y0);  art.lineMid.setAttribute("y2", (y0 + rh * 0.56).toFixed(0));   /* stops where the words start */
   const show = function(el, on){ el.setAttribute("visibility", on ? "visible" : "hidden"); };
@@ -6675,15 +6690,33 @@ function litGuns(){
      would light the other rail's gun from the previous broadside */
   const held = fireTouch !== null && fireChaser === null;
   const firing = !held && fireTouch === null && fireNow === "firing";
-  art.port.classList.toggle("lit",  (held && fireSide < 0) || (firing && pSide < 0));
-  art.stbd.classList.toggle("lit",  (held && fireSide > 0) || (firing && pSide > 0));
-  art.bow.classList.toggle("lit",   fireChaser === "bow");   art.bowL.classList.toggle("lit",   fireChaser === "bow");
-  art.stern.classList.toggle("lit", fireChaser === "stern"); art.sternL.classList.toggle("lit", fireChaser === "stern");
+  art.port.use.classList.toggle("lit",  (held && fireSide < 0) || (firing && pSide < 0));
+  art.stbd.use.classList.toggle("lit",  (held && fireSide > 0) || (firing && pSide > 0));
+  art.bow.use.classList.toggle("lit",   fireChaser === "bow");   art.bowL.classList.toggle("lit",   fireChaser === "bow");
+  art.stern.use.classList.toggle("lit", fireChaser === "stern"); art.sternL.classList.toggle("lit", fireChaser === "stern");
+  /* SEA-K v1.1 — THE SHOT. `padShotT` is written by the frame the broadside
+     fires (beside pShow, in playerFire). Rays: scale 0.6 → 1 → 1.15 and gone by
+     PAD_BURST; ball: from the muzzle out PAD_BALL_PX over PAD_SHOT, then gone.
+     Nothing added or removed — visibility and transform only (SEA-C). */
+  const age = seaT - padShotT;
+  const g = padShotSide < 0 ? art.port : padShotSide > 0 ? art.stbd : null;
+  [art.port, art.stbd].forEach(function(q){
+    const on = q === g && age >= 0 && age < PAD_SHOT;
+    q.ball.setAttribute("visibility", on ? "visible" : "hidden");
+    const bon = on && age < PAD_BURST;
+    q.burst.setAttribute("visibility", bon ? "visible" : "hidden");
+    if(bon){ const k = age / PAD_BURST, sc = k < 0.4 ? 0.6 + k : 1 + (k - 0.4) * 0.25;
+      q.burst.setAttribute("transform", "translate(30 0) scale("+sc.toFixed(2)+") translate(-30 0)");
+      q.burst.setAttribute("opacity", (k < 0.5 ? 1 : 1 - (k - 0.5) * 2).toFixed(2)); }
+    if(on){ q.ball.setAttribute("cx", (50 + PAD_BALL_PX * (age / PAD_SHOT)).toFixed(1));   /* starts clear of the rays' tips */ }
+  });
 }
+const PAD_SHOT = 0.5, PAD_BURST = 0.25, PAD_BALL_PX = 44;   /* s, s, px in the gun's own units — [ASSUMED], from the mock-up's loop */
+let padShotT = -1e9, padShotSide = 0;                       /* runtime, never saved */
 function gunDeckLine(){
   const g = gunDeck();
-  return "preview "+g+"  ·  band "+GUN_BAND+" px  ·  zone "+artW+"x"+artH+" px  ·  broadsides' region "+(artH - (gunDeckHas("bow") ? GUN_BAND : 0) - (gunDeckHas("stern") ? GUN_BAND : 0))+" tall"+
-         (fireChaser ? "  ·  "+fireChaser+" band held (fires nothing until OL-6)" : "")+"  [ASSUMED] sea-k v1.0";
+  return "preview "+g+"  ·  shot: rays "+PAD_BURST+" s, ball "+PAD_SHOT+" s / "+PAD_BALL_PX+" px"+"  ·  band "+GUN_BAND+" px  ·  zone "+artW+"x"+artH+" px  ·  broadsides' region "+(artH - (gunDeckHas("bow") ? GUN_BAND : 0) - (gunDeckHas("stern") ? GUN_BAND : 0))+" tall"+
+         (fireChaser ? "  ·  "+fireChaser+" band held (fires nothing until OL-6)" : "")+"  [ASSUMED] sea-k v1.1";
 }
 function paintFire(){
   layoutFireArt(); litGuns();
